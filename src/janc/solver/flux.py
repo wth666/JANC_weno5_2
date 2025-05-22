@@ -33,13 +33,13 @@ def splitFlux_LF_w(ixy, U, aux):
     zx = (ixy == 1) * 1
     zy = (ixy == 2) * 1
 
-    F = zx*jnp.concatenate([rho * u, rho * u ** 2 + p, rho * u * v, u * (rhoE + p), Y], axis=0) + zy*jnp.concatenate([rho * v, rho * u * v, rho * v ** 2 + p, v * (rhoE + p), Y], axis=0)
+    F = zx*jnp.concatenate([rho * u, rho * u ** 2 + p, rho * u * v, u * (rhoE + p)], axis=0) + zy*jnp.concatenate([rho * v, rho * u * v, rho * v ** 2 + p, v * (rhoE + p)], axis=0)
     um = jnp.nanmax(abs(u) + a)
     vm = jnp.nanmax(abs(v) + a)
     theta = zx*um + zy*vm
     Hplus = 0.5 * (F + theta * U[0:4,:,:])
     Hminus = 0.5 * (F - theta * U[0:4,:,:])
-    return Hplus[0:4], Hminus[0:4], Hplus[4:], Hminus[4:]
+    return Hplus, Hminus
 
 @jit
 def WENO_plus_x(f):
@@ -310,20 +310,23 @@ def weno5(U,aux,dx,dy):
 
 @jit
 def weno5_w(U,aux,dx,dy):
-    Fplus, Fminus, Yxplus, Yxminus = splitFlux_LF_w(1, U, aux)
-    Gplus, Gminus, Yyplus, Yyminus = splitFlux_LF_w(2, U, aux)
+    Fplus, Fminus = splitFlux_LF_w(1, U, aux)
+    Gplus, Gminus = splitFlux_LF_w(2, U, aux)
 
+    Y = U[4:]/U[0:1]
 
     fj1,fj2 = WENO_plus_x_w(Fplus)
-    Y1, Y2 = WENO_plus_x_w(Yxplus)
+    Y1, Y2 = WENO_plus_x_w(Y)
     dFp = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
     fj1, fj2 = WENO_minus_x_w(Fminus)
+    Y1, Y2 = WENO_minus_x_w(Y)
     dFm = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
 
     fj1, fj2 = WENO_plus_y_w(Gplus)
-    Y1, Y2 = WENO_plus_y_w(Yyplus)
+    Y1, Y2 = WENO_plus_y_w(Y)
     dGp = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
     fj1, fj2 = WENO_minus_y_w(Gminus)
+    Y1, Y2 = WENO_minus_y_w(Y)
     dGm = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
 
     dF = dFp + dFm
