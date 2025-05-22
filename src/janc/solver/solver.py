@@ -82,11 +82,10 @@ def set_solver(thermo_set, boundary_set, source_set = None, nondim_set = None, s
             
             U, aux = field[0:-2],field[-2:]
             U1 = U + dt * rhs(U,aux,dx,dy,theta)
-            aux = aux_func.update_aux(U1, aux)
-            U2 = 3/4*U + 1/4 * (U1 + dt * rhs(U1,aux,dx,dy,theta))
-            aux = aux_func.update_aux(U2, aux)
-            U3 = 1/3*U + 2/3 * (U2 + dt * rhs(U2,aux,dx,dy,theta))
-            field = jnp.concatenate([U3,aux],axis=0)
+            field = jnp.concatenate([U1,aux],axis=0)
+            #U2 = 3/4*U + 1/4 * (U1 + dt * rhs(U1,aux,dx,dy,theta))
+            #U3 = 1/3*U + 2/3 * (U2 + dt * rhs(U2,aux,dx,dy,theta))
+            #field = jnp.concatenate([U3,aux],axis=0)
             
             return field
     
