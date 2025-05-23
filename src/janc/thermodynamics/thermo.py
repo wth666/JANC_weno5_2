@@ -145,28 +145,26 @@ def get_T_nasa7(e, Y, initial_T_unused):
     tol = 1e-6
     max_iter = 20
 
-    spatial_shape = e.shape  # e is (1000, 600)
+    spatial_shape = e.shape  # e: (1000, 600)
     scan_shape = (N_scan + 1,) + spatial_shape  # (101, 1000, 600)
 
-    # Create T_scan as (101,) then reshape and broadcast to (101, 1000, 600)
     base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
     T_scan = base_T_scan[:, None, None]  # (101, 1, 1)
-    T_scan = jnp.broadcast_to(T_scan, scan_shape)  # (101, 1000, 600)
+    T_scan = jnp.broadcast_to(T_scan, scan_shape)  # (101, 1000, 600) ✅ 正确
 
     def e_eqn_at_T(T):  # T: (1000, 600)
         T = jnp.expand_dims(T, axis=0)  # (1, 1000, 600)
-        return e_eqn(T, e, Y)[0]  # residual
+        return e_eqn(T, e, Y)[0]  # residual only
 
     res_scan = jax.vmap(e_eqn_at_T)(T_scan)  # (101, 1000, 600)
 
     def find_valid_T0(_):
         sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, 1000, 600)
-        valid_idx = jnp.argmax(sign_change, axis=0)     # (1000, 600)
-        found = jnp.any(sign_change, axis=0)            # (1000, 600)
+        found = jnp.any(sign_change, axis=0)  # (1000, 600)
+        valid_idx = jnp.argmax(sign_change, axis=0)  # (1000, 600)
 
-        # index into T_scan
-        T_lower = jnp.take_along_axis(T_scan, valid_idx[None, :, :], axis=0)[0]
-        T_upper = jnp.take_along_axis(T_scan, (valid_idx + 1)[None, :, :], axis=0)[0]
+        T_lower = T_scan[:-1][valid_idx, jnp.arange(spatial_shape[0])[:, None], jnp.arange(spatial_shape[1])]
+        T_upper = T_scan[1:][valid_idx, jnp.arange(spatial_shape[0])[:, None], jnp.arange(spatial_shape[1])]
         T0 = 0.5 * (T_lower + T_upper)
         T0 = jnp.expand_dims(T0, axis=0)  # (1, 1000, 600)
 
@@ -187,14 +185,9 @@ def get_T_nasa7(e, Y, initial_T_unused):
         init_state = (res, de_dT, d2e_dT2, T0, gamma, 0)
         res_final, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond, body, init_state)
 
-        def if_not_found():
-            dummy = jnp.full_like(gamma_final, jnp.nan)
-            return jnp.concatenate([dummy, dummy], axis=0)
-
-        def if_found():
-            return jnp.concatenate([gamma_final, T_final], axis=0)
-
-        return jnp.where(found, if_found(), if_not_found())
+        result = jnp.concatenate([gamma_final, T_final], axis=0)  # (2, 1000, 600)
+        nan_result = jnp.full_like(result, jnp.nan)
+        return jnp.where(found, result, nan_result)
 
     return find_valid_T0(None)
 
