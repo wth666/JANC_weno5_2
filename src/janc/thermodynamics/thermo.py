@@ -153,8 +153,23 @@ def get_T_nasa7(e,Y,initial_T):
         return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
     initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
-    _, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
-    return jnp.concatenate([gamma_final, T_final],axis=0)
+    #_, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
+    #return jnp.concatenate([gamma_final, T_final],axis=0)
+    final_res, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond_fun, body_fun, initial_state)
+    def check_convergence(args):
+        final_res, T_final, gamma_final, final_iter = args
+
+    def not_converged(_):
+        jax.debug.print("get_T_nasa7 未收敛：迭代达到最大次数 ({})", max_iter)
+        return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
+
+     def converged(_):
+        return jnp.concatenate([gamma_final, T_final], axis=0)
+
+    return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
+
+    #显式检查收敛并返回结果
+    return check_convergence((final_res, T_final, gamma_final, final_iter))
     
 def get_T_fwd(e,Y,initial_T):
     aux_new = get_T_nasa7(e,Y,initial_T)
