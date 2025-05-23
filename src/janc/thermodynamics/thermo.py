@@ -139,46 +139,66 @@ def e_eqn(T, e, Y):
     return res, dres_dT, ddres_dT2, gamma
 
 @custom_vjp
-def get_T_nasa7(e,Y,initial_T):
-    
-    initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
+def get_T_nasa7(e, Y, initial_T_unused):
 
-    def cond_fun(args):
-        res, de_dT, d2e_dT2, T, gamma, i = args
-        return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
+    T_min = 0.2
+    T_max = 8000.0 / nondim.T0
+    N_scan = 100  # 子区间个数
 
-    def body_fun(args):
-        res, de_dT, d2e_dT2, T, gamma, i = args
-        #delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
-        delta_T = -res/de_dT
-        T_new = T + delta_T
-        # 限制温度范围，比如 T_min=200, T_max=5000 (根据你的物理范围调整)
-        #T_min = 0.2
-        #T_max = 8000.0/nondim.T0
-        #T_new = jnp.clip(T_new, T_min, T_max)
-        res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
-        return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
+    T_scan = jnp.linspace(T_min, T_max, N_scan + 1)
+    res_scan = jax.vmap(lambda T: e_eqn(T, e, Y)[0])(T_scan)
 
-    initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
-    #_, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
-    #return jnp.concatenate([gamma_final, T_final],axis=0)
-    final_res, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond_fun, body_fun, initial_state)
-    def check_convergence(args):
-        final_res, T_final, gamma_final, final_iter = args
+    def find_valid_T0(_):
+        # 查找满足 res[i] * res[i+1] < 0 的子区间
+        sign_change = res_scan[:-1] * res_scan[1:] < 0
+        valid_idx = jnp.where(sign_change, size=1, fill_value=-1)[0]  # 找到第一个
+        found = valid_idx != -1
 
-        def not_converged(_):
-            jax.debug.print("get_T_nasa7 未收敛：迭代达到最大次数 ({})", max_iter)
-            return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
+        def no_root_found(_):
+            jax.debug.print("get_T_nasa7：在 [{}, {}] 中所有子区间无零点", T_min, T_max)
+            dummy_gamma = jnp.full_like(Y, jnp.nan)
+            dummy_T = jnp.array([jnp.nan])
+            return jnp.concatenate([dummy_gamma, dummy_T], axis=0)
 
-        def converged(_):
-            max_res = jnp.max(jnp.abs(final_res))
-            jax.debug.print("get_T_nasa7 收敛，最大残差: {}", max_res)
-            return jnp.concatenate([gamma_final, T_final], axis=0)
+        def proceed_with_newton(valid_idx):
+            T0 = 0.5 * (T_scan[valid_idx] + T_scan[valid_idx + 1])
+            initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(T0, e, Y)
 
-        return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
+            def cond_fun(args):
+                res, de_dT, d2e_dT2, T, gamma, i = args
+                return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
 
-    #显式检查收敛并返回结果
-    return check_convergence((final_res, T_final, gamma_final, final_iter))
+            def body_fun(args):
+                res, de_dT, d2e_dT2, T, gamma, i = args
+                delta_T = -res / (de_dT + 1e-12)
+                delta_T = jnp.clip(delta_T, -0.5, 0.5)
+                T_new = jnp.clip(T + delta_T, T_min, T_max)
+                res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e, Y)
+                return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
+
+            initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, T0, initial_gamma, 0)
+            final_res, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond_fun, body_fun, initial_state)
+
+            def check_convergence(args):
+                final_res, T_final, gamma_final, final_iter = args
+
+                def not_converged(_):
+                    jax.debug.print("get_T_nasa7 未收敛：迭代达到最大次数 ({})", max_iter)
+                    return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
+
+                def converged(_):
+                    max_res = jnp.max(jnp.abs(final_res))
+                    jax.debug.print("get_T_nasa7 收敛，最大残差: {}", max_res)
+                    return jnp.concatenate([gamma_final, T_final], axis=0)
+
+                return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
+
+            return check_convergence((final_res, T_final, gamma_final, final_iter))
+
+        return lax.cond(found, proceed_with_newton, no_root_found, valid_idx)
+
+    return find_valid_T0(None)
+
     
 def get_T_fwd(e,Y,initial_T):
     aux_new = get_T_nasa7(e,Y,initial_T)
