@@ -203,7 +203,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
     return newton_solver(T0)
 '''
 
-
+'''
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
     
@@ -223,6 +223,77 @@ def get_T_nasa7(e,Y,initial_T):
     initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
     _, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
     return jnp.concatenate([gamma_final, T_final],axis=0)
+'''
+
+@custom_vjp
+def get_T_nasa7(e, Y, initial_T):
+    # === 参数设定 ===
+    T_min = 0.2
+    T_max = 8000.0 / nondim.T0
+    N_scan = 100
+
+    spatial_shape = e.shape[1:]  # e: (1, 1000, 600)
+
+    # === 快速牛顿解算器 ===
+    def solve_with_T(T0):
+        def body_fun(args):
+            T, i = args
+            cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
+            res = (h - R * T) - e
+            dres_dT = cp - R
+            delta_T = -res / (dres_dT + 1e-12)
+            delta_T = jnp.clip(delta_T, -0.5, 0.5)
+            T_new = jnp.clip(T + delta_T, T_min, T_max)
+            return (T_new, i + 1)
+
+        def cond_fun(args):
+            T, i = args
+            cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
+            res = (h - R * T) - e
+            return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
+
+        T_final, _ = lax.while_loop(cond_fun, body_fun, (T0, 0))
+        cp, gamma, *_ = get_thermo_nasa7(T_final, Y)
+
+        res_check = (h - R * T_final) - e
+        failed = jnp.any(jnp.abs(res_check) > tol, axis=0)  # (1000,600)
+        return gamma, T_final, failed
+
+    # === 1. 使用初始 T 进行快速牛顿迭代 ===
+    gamma_fast, T_fast, failed_flag = solve_with_T(initial_T)
+
+    # === 2. 回退：仅在发散点执行 T_scan 找初值 + 再牛顿 ===
+    def fallback_with_scan():
+        base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
+        T_scan = base_T_scan[:, None, None, None]  # (101,1,1,1)
+        T_scan = jnp.broadcast_to(T_scan, (N_scan + 1, 1, *spatial_shape))  # (101,1,H,W)
+
+        def e_eqn_at_T(T):
+            cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
+            return (h - R * T) - e
+
+        res_scan = vmap(e_eqn_at_T)(T_scan)[:, 0, :, :]  # (101, H, W)
+        sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, H, W)
+        found = jnp.any(sign_change, axis=0)
+        valid_idx = jnp.argmax(sign_change, axis=0)
+
+        ix = jnp.arange(spatial_shape[0])[:, None]
+        iy = jnp.arange(spatial_shape[1])[None, :]
+        T0_left = T_scan[valid_idx, 0, ix, iy]
+        T0_right = T_scan[valid_idx + 1, 0, ix, iy]
+        T0 = 0.5 * (T0_left + T0_right)
+        T0 = T0[None, :, :]  # (1, H, W)
+
+        gamma_refined, T_refined, _ = solve_with_T(T0)
+        return gamma_refined, T_refined
+
+    gamma_refined, T_refined = fallback_with_scan()
+
+    # === 3. 合并 fallback 结果（仅替换失败点） ===
+    gamma_final = jnp.where(failed_flag[None, :, :], gamma_refined, gamma_fast)
+    T_final = jnp.where(failed_flag, T_refined, T_fast)
+
+    return jnp.concatenate([gamma_final, T_final[None, :, :]], axis=0)  # (10, H, W)
 
 
 
