@@ -150,7 +150,7 @@ def get_T_nasa7(e,Y,initial_T):
         res, de_dT, d2e_dT2, T, gamma, i = args
         #delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
         delta_T = -res/de_dT
-        T_new = T + 0.5*delta_T
+        T_new = T + 0.1*delta_T
         # 限制温度范围，比如 T_min=200, T_max=5000 (根据你的物理范围调整)
         #T_min = 0.2
         #T_max = 8000.0/nondim.T0
