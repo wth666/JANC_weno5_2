@@ -165,7 +165,8 @@ def get_T_nasa7(e,Y,initial_T):
             return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
 
         def converged(_):
-            jax.debug.print("收敛了")
+            max_res = jnp.max(jnp.abs(final_res))
+            jax.debug.print("get_T_nasa7 收敛，最大残差: {}", max_res)
             return jnp.concatenate([gamma_final, T_final], axis=0)
 
         return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
