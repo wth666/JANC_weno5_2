@@ -145,12 +145,17 @@ def get_T_nasa7(e, Y, initial_T_unused):
     N_scan = 100  # 子区间个数
 
     T_scan = jnp.linspace(T_min, T_max, N_scan + 1)
-    res_scan = jax.vmap(lambda T: e_eqn(T, e, Y)[0])(T_scan)
+
+    def get_res(T):
+        res, _, _, _ = e_eqn(T, e, Y)
+        return res
+
+    res_scan = jax.vmap(get_res)(T_scan)
 
     def find_valid_T0(_):
         # 查找满足 res[i] * res[i+1] < 0 的子区间
         sign_change = res_scan[:-1] * res_scan[1:] < 0
-        valid_idx = jnp.where(sign_change, size=1, fill_value=-1)[0]  # 找到第一个
+        valid_idx = jnp.where(sign_change, size=1, fill_value=-1)[0]
         found = valid_idx != -1
 
         def no_root_found(_):
@@ -160,12 +165,12 @@ def get_T_nasa7(e, Y, initial_T_unused):
             return jnp.concatenate([dummy_gamma, dummy_T], axis=0)
 
         def proceed_with_newton(valid_idx):
-            T0 = 0.5 * (jnp.take(T_scan, valid_idx) + jnp.take(T_scan, valid_idx + 1))
+            T0 = 0.5 * (T_scan[valid_idx] + T_scan[valid_idx + 1])
             initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(T0, e, Y)
 
             def cond_fun(args):
                 res, de_dT, d2e_dT2, T, gamma, i = args
-                return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
+                return (jnp.abs(res) > tol) & (i < max_iter)
 
             def body_fun(args):
                 res, de_dT, d2e_dT2, T, gamma, i = args
@@ -186,7 +191,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
                     return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
 
                 def converged(_):
-                    max_res = jnp.max(jnp.abs(final_res))
+                    max_res = jnp.abs(final_res)
                     jax.debug.print("get_T_nasa7 收敛，最大残差: {}", max_res)
                     return jnp.concatenate([gamma_final, T_final], axis=0)
 
