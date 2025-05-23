@@ -227,52 +227,48 @@ def get_T_nasa7(e,Y,initial_T):
 
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T):
-    # === 参数设定 ===
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
     N_scan = 100
+    spatial_shape = e.shape[1:]
 
-    spatial_shape = e.shape[1:]  # e: (1, 1000, 600)
-
-    # === 快速牛顿解算器 ===
-    def solve_with_T(T0):
-        def body_fun(args):
-            T, i = args
-            cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
-            res = (h - R * T) - e
-            dres_dT = cp - R
-            delta_T = -res / (dres_dT + 1e-12)
-            delta_T = jnp.clip(delta_T, -0.5, 0.5)
-            T_new = jnp.clip(T + delta_T, T_min, T_max)
-            return (T_new, i + 1)
+    # === 稳定牛顿迭代器 ===
+    def solve_newton(T0, e_local, Y_local):
+        res0, de_dT0, d2e_dT20, gamma0 = e_eqn(T0, e_local, Y_local)
 
         def cond_fun(args):
-            T, i = args
-            cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
-            res = (h - R * T) - e
+            res, de_dT, d2e_dT2, T, gamma, i = args
             return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
 
-        T_final, _ = lax.while_loop(cond_fun, body_fun, (T0, 0))
-        cp, gamma, h, *_ = get_thermo_nasa7(T_final, Y)
+        def body_fun(args):
+            res, de_dT, d2e_dT2, T, gamma, i = args
+            delta_T = -2 * res * de_dT / (2 * jnp.square(de_dT) - res * d2e_dT2 + 1e-12)
+            T_new = jnp.clip(T + delta_T, T_min, T_max)
+            res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e_local, Y_local)
+            return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
-        res_check = (h - R * T_final) - e
-        failed = jnp.any(jnp.abs(res_check) > tol, axis=0)  # (1000,600)
-        return gamma, T_final, failed
+        init_state = (res0, de_dT0, d2e_dT20, T0, gamma0, 0)
+        _, _, _, T_final, gamma_final, _ = lax.while_loop(cond_fun, body_fun, init_state)
+        return T_final, gamma_final
 
-    # === 1. 使用初始 T 进行快速牛顿迭代 ===
-    gamma_fast, T_fast, failed_flag = solve_with_T(initial_T)
+    # === 快速路径：用 initial_T 执行一次 ===
+    T_fast, gamma_fast = solve_newton(initial_T, e, Y)
 
-    # === 2. 回退：仅在发散点执行 T_scan 找初值 + 再牛顿 ===
-    def fallback_with_scan():
+    # === 判断哪些点发散了 ===
+    res_check, *_ = e_eqn(T_fast, e, Y)
+    failed = jnp.any(jnp.abs(res_check) > tol, axis=0)  # (H, W)
+
+    # === fallback: 扫描 + 中点迭代 ===
+    def fallback_scan():
         base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
         T_scan = base_T_scan[:, None, None, None]  # (101,1,1,1)
         T_scan = jnp.broadcast_to(T_scan, (N_scan + 1, 1, *spatial_shape))  # (101,1,H,W)
 
-        def e_eqn_at_T(T):
-            cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
-            return (h - R * T) - e
+        def e_res_at_T(T):
+            res, *_ = e_eqn(T, e, Y)
+            return res
 
-        res_scan = vmap(e_eqn_at_T)(T_scan)[:, 0, :, :]  # (101, H, W)
+        res_scan = vmap(e_res_at_T)(T_scan)[:, 0, :, :]  # (101, H, W)
         sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, H, W)
         found = jnp.any(sign_change, axis=0)
         valid_idx = jnp.argmax(sign_change, axis=0)
@@ -282,18 +278,19 @@ def get_T_nasa7(e, Y, initial_T):
         T0_left = T_scan[valid_idx, 0, ix, iy]
         T0_right = T_scan[valid_idx + 1, 0, ix, iy]
         T0 = 0.5 * (T0_left + T0_right)
-        T0 = T0[None, :, :]  # (1, H, W)
+        T0 = T0[None, :, :]
 
-        gamma_refined, T_refined, _ = solve_with_T(T0)
+        T_refined, gamma_refined = solve_newton(T0, e, Y)
         return gamma_refined, T_refined
 
-    gamma_refined, T_refined = fallback_with_scan()
+    gamma_fallback, T_fallback = fallback_scan()
 
-    # === 3. 合并 fallback 结果（仅替换失败点） ===
-    gamma_final = jnp.where(failed_flag[None, :, :], gamma_refined, gamma_fast)
-    T_final = jnp.where(failed_flag, T_refined, T_fast)
+    # === 合并两者 ===
+    gamma_final = jnp.where(failed[None, :, :], gamma_fallback, gamma_fast)
+    T_final = jnp.where(failed, T_fallback, T_fast)
 
-    return jnp.concatenate([gamma_final, T_final[None, :, :]], axis=0)  # (10, H, W)
+    return jnp.concatenate([gamma_final, T_final[None, :, :]], axis=0)  # (2, H, W)
+
 
 
 
