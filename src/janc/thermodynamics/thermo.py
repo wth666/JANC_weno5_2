@@ -116,7 +116,7 @@ def get_gibbs(T):
                                    s_cof_low[0:n],s_cof_high[0:n],
                                    logcof_low[0:n],logcof_high[0:n],
                                    T)
-'''
+
 def get_thermo_nasa7(T, Y):
     """
     thermo properties evaluation with nasa7 polynomial
@@ -129,23 +129,6 @@ def get_thermo_nasa7(T, Y):
     dcp = jnp.sum(dcp_i*Y,axis=0,keepdims=True)
     gamma = cp/(cp-R)
     return cp, gamma, h, R, dcp
-'''
-def get_thermo_nasa7(T, Y):
-    """
-    thermo properties evaluation with nasa7 polynomial
-    """
-    R = get_R(Y)
-    Y = fill_Y(Y)
-    cp_i, dcp_i, h_i = get_thermo_properties(T[0])
-    cp_i = cp_i[:, None, None]
-    dcp_i = dcp_i[:, None, None]
-    h_i = h_i[:, None, None]
-    cp = jnp.sum(cp_i * Y, axis=0, keepdims=True)
-    h = jnp.sum(h_i * Y, axis=0, keepdims=True)
-    dcp = jnp.sum(dcp_i * Y, axis=0, keepdims=True)
-    gamma = cp / (cp - R)
-    return cp, gamma, h, R, dcp
-
 
 def e_eqn(T, e, Y):
     cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
