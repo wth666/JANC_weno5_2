@@ -137,7 +137,11 @@ def e_eqn(T, e, Y):
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
-@custom_vjp
+import jax
+import jax.numpy as jnp
+from jax import lax
+
+@jax.custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
@@ -147,7 +151,6 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     spatial_shape = e.shape[1:]  # (1000, 600)
     base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
-    # 扩展温度扫描维度，变成 (101, 1, 1000, 600)
     T_scan = base_T_scan[:, None, None, None]
     T_scan = jnp.broadcast_to(T_scan, (N_scan + 1, 1, *spatial_shape))  # (101, 1, 1000, 600)
 
@@ -156,29 +159,20 @@ def get_T_nasa7(e, Y, initial_T_unused):
         res = (h - R * T) - e
         return res
 
-    # 计算残差 (101, 1, 1000, 600)
     res_scan = jax.vmap(e_eqn_at_T)(T_scan)  # (101, 1, 1000, 600)
-
-    # 降维去掉第二维 singleton，变成 (101, 1000, 600)
-    res_scan = res_scan[:, 0, :, :]
+    res_scan = res_scan[:, 0, :, :]  # (101, 1000, 600)
 
     sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, 1000, 600)
-
-    # 找每个点第一个 sign change 的索引，如果没找到则是0，标记found
     found = jnp.any(sign_change, axis=0)  # (1000, 600)
     valid_idx = jnp.argmax(sign_change, axis=0)  # (1000, 600)
 
-    # 为了索引 T_scan，先扩展 spatial 维度索引
     ix = jnp.arange(spatial_shape[0])[:, None]  # (1000,1)
     iy = jnp.arange(spatial_shape[1])[None, :]  # (1,600)
 
-    # 获取有效T区间的两端点 (1, 1000, 600)
     T0_left = T_scan[valid_idx, 0, ix, iy]       # (1000, 600)
     T0_right = T_scan[valid_idx + 1, 0, ix, iy]  # (1000, 600)
     T0 = 0.5 * (T0_left + T0_right)               # (1000, 600)
-
-    # 让 T0 变成 (1, 1000, 600)，匹配 get_thermo_nasa7 输入
-    T0 = T0[None, :, :]
+    T0 = T0[None, :, :]  # (1, 1000, 600)
 
     def newton_solver(T0):
         def body_fun(args):
@@ -200,15 +194,17 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
         T_final, _ = lax.while_loop(cond_fun, body_fun, (T0, 0))
         cp, gamma, *_ = get_thermo_nasa7(T_final, Y)
-        # 返回 gamma + T_final，维度为 (9+1, 1000, 600)
-        return jnp.concatenate([gamma, T_final], axis=0)
+        return jnp.concatenate([gamma, T_final], axis=0)  # (9+1, 1000, 600)
 
     def no_root_case():
-        dummy_gamma = jnp.full_like(Y, jnp.nan)
-        dummy_T = jnp.full_like(e, jnp.nan)
-        return jnp.concatenate([dummy_gamma, dummy_T], axis=0)
+        msg = "Error: no valid root found in get_T_nasa7."
+        jax.debug.print(msg)
+        assert False, msg
+        dummy = jnp.full_like(e, jnp.nan)
+        return jnp.concatenate([dummy, dummy], axis=0)  # (2, 1000, 600), 保证shape与newton_solver一致
 
     return lax.cond(jnp.any(found), lambda _: newton_solver(T0), lambda _: no_root_case(), operand=None)
+
 
 
 
