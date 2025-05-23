@@ -231,7 +231,8 @@ def get_T_nasa7(e,Y,initial_T):
 
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T):
-   
+    spatial_shape = e.shape[1:]  # (H, W)
+
     # === 牛顿迭代内嵌 ===
     def solve_newton(T0, e, Y):
         def body_fun(val):
