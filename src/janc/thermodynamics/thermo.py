@@ -289,7 +289,7 @@ def get_T_nasa7(e, Y, initial_T):
     gamma_final = jnp.where(failed[None, :, :], gamma_fallback, gamma_fast)
     T_final = jnp.where(failed, T_fallback, T_fast)
 
-    return jnp.concatenate([gamma_final, T_final[None, :, :]], axis=0)  # (2, H, W)
+    return jnp.concatenate([gamma_final, T_final], axis=0)  # (2, H, W)
 
 
 
