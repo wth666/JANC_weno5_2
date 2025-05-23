@@ -166,7 +166,7 @@ def get_T_nasa7(e,Y,initial_T):
         def converged(_):
             return jnp.concatenate([gamma_final, T_final], axis=0)
 
-    return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
+        return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
 
     #显式检查收敛并返回结果
     return check_convergence((final_res, T_final, gamma_final, final_iter))
