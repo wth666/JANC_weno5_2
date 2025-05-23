@@ -136,7 +136,7 @@ def e_eqn(T, e, Y):
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
-
+'''
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
     T_min = 0.2
@@ -201,8 +201,28 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     #return lax.cond(jnp.any(found), lambda _: newton_solver(T0), lambda _: no_root_case(), operand=None)
     return newton_solver(T0)
+'''
 
 
+@custom_vjp
+def get_T_nasa7(e,Y,initial_T):
+    
+    initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
+
+    def cond_fun(args):
+        res, de_dT, d2e_dT2, T, gamma, i = args
+        return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
+
+    def body_fun(args):
+        res, de_dT, d2e_dT2, T, gamma, i = args
+        delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
+        T_new = T + delta_T
+        res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
+        return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
+
+    initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
+    _, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
+    return jnp.concatenate([gamma_final, T_final],axis=0)
 
 
 
