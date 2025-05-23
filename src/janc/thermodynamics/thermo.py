@@ -142,20 +142,25 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
-    N_scan = 100
+    N_scan = 100  # 子区间个数
+    tol = 1e-8
+    max_iter = 100
 
     T_scan = jnp.linspace(T_min, T_max, N_scan + 1)
 
-    # get_res 接收标量T
+    # 包装e_eqn，保证传入的是长度为1的数组
+    def e_eqn_wrapped(T_scalar, e, Y):
+        T_array = jnp.array([T_scalar])
+        return e_eqn(T_array, e, Y)
+
     def get_res(T_scalar):
-        # 传入e_eqn一个长度为1的数组，保证T[0]是标量
-        T_input = jnp.array([T_scalar])  # shape (1,)
-        res, _, _, _ = e_eqn(T_input, e, Y)
+        res, _, _, _ = e_eqn_wrapped(T_scalar, e, Y)
         return res
 
     res_scan = jax.vmap(get_res)(T_scan)
 
     def find_valid_T0(_):
+        # 查找符号变化区间
         sign_change = res_scan[:-1] * res_scan[1:] < 0
         valid_idx = jnp.where(sign_change, size=1, fill_value=-1)[0]
         found = valid_idx != -1
@@ -168,8 +173,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
         def proceed_with_newton(valid_idx):
             T0 = 0.5 * (T_scan[valid_idx] + T_scan[valid_idx + 1])
-            # 同样传入长度为1数组
-            initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(jnp.array([T0]), e, Y)
+            initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn_wrapped(T0, e, Y)
 
             def cond_fun(args):
                 res, de_dT, d2e_dT2, T, gamma, i = args
@@ -180,7 +184,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
                 delta_T = -res / (de_dT + 1e-12)
                 delta_T = jnp.clip(delta_T, -0.5, 0.5)
                 T_new = jnp.clip(T + delta_T, T_min, T_max)
-                res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(jnp.array([T_new]), e, Y)
+                res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn_wrapped(T_new, e, Y)
                 return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
             initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, T0, initial_gamma, 0)
