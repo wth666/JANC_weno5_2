@@ -13,6 +13,9 @@ from ..preprocess import nondim
 from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
 
+T_min = 0.2
+T_max = 8000.0 / nondim.T0
+N_scan = 100  # number of scan intervals
 
 max_iter = 5000
 tol = 5e-9
@@ -225,9 +228,7 @@ def get_T_nasa7(e,Y,initial_T):
     return jnp.concatenate([gamma_final, T_final],axis=0)
 '''
 
-T_min = 0.2
-T_max = 8000.0 / nondim.T0
-N_scan = 100  # number of scan intervals
+
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T, tol, max_iter, 
                 e_eqn, T_min, T_max, N_scan):
