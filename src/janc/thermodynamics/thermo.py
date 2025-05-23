@@ -146,8 +146,9 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     T_scan = jnp.linspace(T_min, T_max, N_scan + 1)
 
-    def get_res(T):
-        res, _, _, _ = e_eqn(T, e, Y)
+    def get_res(T_scalar):
+        T_array = jnp.array([T_scalar])  # 保证传入的 T 是长度为1的数组
+        res, _, _, _ = e_eqn(T_array, e, Y)
         return res
 
     res_scan = jax.vmap(get_res)(T_scan)
