@@ -159,12 +159,12 @@ def get_T_nasa7(e,Y,initial_T):
     def check_convergence(args):
         final_res, T_final, gamma_final, final_iter = args
 
-    def not_converged(_):
-        jax.debug.print("get_T_nasa7 未收敛：迭代达到最大次数 ({})", max_iter)
-        return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
+        def not_converged(_):
+            jax.debug.print("get_T_nasa7 未收敛：迭代达到最大次数 ({})", max_iter)
+            return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
 
-     def converged(_):
-        return jnp.concatenate([gamma_final, T_final], axis=0)
+        def converged(_):
+            return jnp.concatenate([gamma_final, T_final], axis=0)
 
     return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
 
