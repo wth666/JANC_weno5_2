@@ -199,7 +199,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
     def no_root_case():
         msg = "Error: no valid root found in get_T_nasa7."
         jax.debug.print(msg)
-        assert False, msg
+        #assert False, msg
         dummy = jnp.full_like(e, jnp.nan)
         return jnp.concatenate([dummy, dummy], axis=0)  # (2, 1000, 600), 保证shape与newton_solver一致
 
