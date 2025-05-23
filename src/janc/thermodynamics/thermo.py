@@ -143,53 +143,62 @@ def get_T_nasa7(e, Y, initial_T_unused):
     T_max = 8000.0 / nondim.T0
     N_scan = 100
     tol = 1e-6
-    max_iter = 20
+    max_iter = 100
 
-    spatial_shape = e.shape  # e: (1000, 600)
+    spatial_shape = e.shape
     scan_shape = (N_scan + 1,) + spatial_shape  # (101, 1000, 600)
 
+    # 生成 T_scan，每个网格点都有独立的扫描温度
     base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
-    T_scan = base_T_scan[:, None, None]  # (101, 1, 1)
-    T_scan = jnp.broadcast_to(T_scan, scan_shape)  # (101, 1000, 600) ✅ 正确
+    T_scan = base_T_scan[:, None, None]
+    T_scan = jnp.broadcast_to(T_scan, scan_shape)  # (101, 1000, 600)
 
     def e_eqn_at_T(T):  # T: (1000, 600)
-        T = jnp.expand_dims(T, axis=0)  # (1, 1000, 600)
-        return e_eqn(T, e, Y)[0]  # residual only
+        cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
+        res = (h - R * T) - e
+        dres_dT = cp - R
+        d2res_dT2 = dcp
+        return res, dres_dT, d2res_dT2, gamma
 
-    res_scan = jax.vmap(e_eqn_at_T)(T_scan)  # (101, 1000, 600)
+    # (101, 1000, 600)
+    res_scan, _, _, _ = jax.vmap(e_eqn_at_T)(T_scan)
 
     def find_valid_T0(_):
-        sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, 1000, 600)
-        found = jnp.any(sign_change, axis=0)  # (1000, 600)
-        valid_idx = jnp.argmax(sign_change, axis=0)  # (1000, 600)
+        sign_change = res_scan[:-1] * res_scan[1:] < 0
+        valid_idx = jnp.argmax(sign_change, axis=0)
+        found = jnp.any(sign_change, axis=0)
 
-        T_lower = T_scan[:-1][valid_idx, jnp.arange(spatial_shape[0])[:, None], jnp.arange(spatial_shape[1])]
-        T_upper = T_scan[1:][valid_idx, jnp.arange(spatial_shape[0])[:, None], jnp.arange(spatial_shape[1])]
-        T0 = 0.5 * (T_lower + T_upper)
-        T0 = jnp.expand_dims(T0, axis=0)  # (1, 1000, 600)
+        T0_low = T_scan[:-1][valid_idx, jnp.arange(spatial_shape[0])[:, None], jnp.arange(spatial_shape[1])[None, :]]
+        T0_high = T_scan[1:][valid_idx, jnp.arange(spatial_shape[0])[:, None], jnp.arange(spatial_shape[1])[None, :]]
+        T0 = 0.5 * (T0_low + T0_high)
 
-        res, de_dT, d2e_dT2, gamma = e_eqn(T0, e, Y)
+        def newton_solver(T_init):
+            def body_fun(state):
+                T, i = state
+                res, dres_dT, d2res_dT2, gamma = e_eqn_at_T(T)
+                delta_T = -res / (dres_dT + 1e-12)
+                delta_T = jnp.clip(delta_T, -0.5, 0.5)
+                T_new = jnp.clip(T + delta_T, T_min, T_max)
+                return T_new, i + 1
 
-        def cond(args):
-            res, _, _, _, _, i = args
-            return (jnp.abs(res) > tol).any() & (i < max_iter)
+            def cond_fun(state):
+                T, i = state
+                res, _, _, _ = e_eqn_at_T(T)
+                return (jnp.abs(res) > tol).any() & (i < max_iter)
 
-        def body(args):
-            res, de_dT, d2e_dT2, T, gamma, i = args
-            delta_T = -res / (de_dT + 1e-12)
-            delta_T = jnp.clip(delta_T, -0.5, 0.5)
-            T_new = jnp.clip(T + delta_T, T_min, T_max)
-            res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e, Y)
-            return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
+            T_final, _ = lax.while_loop(cond_fun, body_fun, (T_init, 0))
+            _, _, _, gamma = e_eqn_at_T(T_final)
+            return jnp.concatenate([gamma, T_final[None, ...]], axis=0)
 
-        init_state = (res, de_dT, d2e_dT2, T0, gamma, 0)
-        res_final, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond, body, init_state)
-
-        result = jnp.concatenate([gamma_final, T_final], axis=0)  # (2, 1000, 600)
-        nan_result = jnp.full_like(result, jnp.nan)
-        return jnp.where(found, result, nan_result)
+        return lax.cond(
+            found.all(),
+            lambda _: newton_solver(T0),
+            lambda _: jnp.full((Y.shape[0] + 1,) + spatial_shape, jnp.nan),
+            operand=None,
+        )
 
     return find_valid_T0(None)
+
 
 
 
