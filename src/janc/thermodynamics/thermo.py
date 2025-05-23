@@ -16,8 +16,7 @@ import os
 
 
 max_iter = 5000
-#tol = 5e-9
-tol = 1e-3
+tol = 5e-9
 
 species_M = None
 Mex = None
