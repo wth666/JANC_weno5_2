@@ -225,71 +225,68 @@ def get_T_nasa7(e,Y,initial_T):
     return jnp.concatenate([gamma_final, T_final],axis=0)
 '''
 
+T_min = 0.2
+T_max = 8000.0 / nondim.T0
+N_scan = 100  # number of scan intervals
 @custom_vjp
-def get_T_nasa7(e, Y, initial_T):
-    T_min = 0.2
-    T_max = 8000.0 / nondim.T0
-    N_scan = 100
-    spatial_shape = e.shape[1:]
+def get_T_nasa7(e, Y, initial_T, tol, max_iter, 
+                e_eqn, T_min, T_max, N_scan):
+   
+    # === 牛顿迭代内嵌 ===
+    def solve_newton(T0, e, Y):
+        def body_fun(val):
+            T, _ = val
+            res, dres, _, gamma = e_eqn(T, e, Y)
+            delta = res / (dres + 1e-10)
+            T_next = T - delta
+            return (T_next, gamma)
 
-    # === 稳定牛顿迭代器 ===
-    def solve_newton(T0, e_local, Y_local):
-        res0, de_dT0, d2e_dT20, gamma0 = e_eqn(T0, e_local, Y_local)
+        def cond_fun(val):
+            T, _ = val
+            res, *_ = e_eqn(T, e, Y)
+            err = jnp.max(jnp.abs(res))
+            return err > tol
 
-        def cond_fun(args):
-            res, de_dT, d2e_dT2, T, gamma, i = args
-            return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
+        def newton_loop(T_init):
+            val = (T_init, jnp.zeros_like(T_init))
+            val = lax.while_loop(cond_fun, body_fun, val)
+            return val  # (T_final, gamma)
 
-        def body_fun(args):
-            res, de_dT, d2e_dT2, T, gamma, i = args
-            delta_T = -2 * res * de_dT / (2 * jnp.square(de_dT) - res * d2e_dT2 + 1e-12)
-            T_new = jnp.clip(T + delta_T, T_min, T_max)
-            res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e_local, Y_local)
-            return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
-
-        init_state = (res0, de_dT0, d2e_dT20, T0, gamma0, 0)
-        _, _, _, T_final, gamma_final, _ = lax.while_loop(cond_fun, body_fun, init_state)
+        # vmap over batch (channel, H, W)
+        T_final, gamma_final = newton_loop(T0)
         return T_final, gamma_final
 
-    # === 快速路径：用 initial_T 执行一次 ===
-    T_fast, gamma_fast = solve_newton(initial_T, e, Y)
 
-    # === 判断哪些点发散了 ===
-    res_check, *_ = e_eqn(T_fast, e, Y)
-    failed = jnp.any(jnp.abs(res_check) > tol, axis=0)  # (H, W)
+    # === 扫描构造新的 T 初值 ===
+    base_T = jnp.linspace(T_min, T_max, N_scan + 1)  # (N_scan+1,)
 
-    # === fallback: 扫描 + 中点迭代 ===
-    def fallback_scan():
-        base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
-        T_scan = base_T_scan[:, None, None, None]  # (101,1,1,1)
-        T_scan = jnp.broadcast_to(T_scan, (N_scan + 1, 1, *spatial_shape))  # (101,1,H,W)
+    def compute_res(T_scalar):
+        T_full = jnp.ones((1, *spatial_shape)) * T_scalar
+        res, *_ = e_eqn(T_full, e, Y)
+        return res  # (1, H, W)
 
-        def e_res_at_T(T):
-            res, *_ = e_eqn(T, e, Y)
-            return res
+    res_scan = vmap(compute_res)(base_T)  # (N_scan+1, 1, H, W)
+    res_scan = res_scan[:, 0, :, :]  # (N_scan+1, H, W)
 
-        res_scan = vmap(e_res_at_T)(T_scan)[:, 0, :, :]  # (101, H, W)
-        sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, H, W)
-        found = jnp.any(sign_change, axis=0)
-        valid_idx = jnp.argmax(sign_change, axis=0)
+    sign_change = (res_scan[:-1] * res_scan[1:] < 0)
+    valid_idx = jnp.argmax(sign_change, axis=0)  # (H, W)
 
-        ix = jnp.arange(spatial_shape[0])[:, None]
-        iy = jnp.arange(spatial_shape[1])[None, :]
-        T0_left = T_scan[valid_idx, 0, ix, iy]
-        T0_right = T_scan[valid_idx + 1, 0, ix, iy]
-        T0 = 0.5 * (T0_left + T0_right)
-        T0 = T0[None, :, :]
+    T_left = base_T[valid_idx]
+    T_right = base_T[valid_idx + 1]
+    T0_scan = 0.5 * (T_left + T_right)  # (H, W)
 
-        T_refined, gamma_refined = solve_newton(T0, e, Y)
-        return gamma_refined, T_refined
+    T0_init = jnp.where(failed, T0_scan, initial_T[0])  # (H, W)
+    T0_init = T0_init[None, :, :]  # (1, H, W)
 
-    gamma_fallback, T_fallback = fallback_scan()
+    # === 第三步：重新牛顿迭代 ===
+    T_refined, gamma_refined = solve_newton(T0_init, e, Y)
 
-    # === 合并两者 ===
-    gamma_final = jnp.where(failed[None, :, :], gamma_fallback, gamma_fast)
-    T_final = jnp.where(failed, T_fallback, T_fast)
+    # === 第四步：合并结果 ===
+    gamma_final =  gamma_refined
+    T_final = T_refined
 
     return jnp.concatenate([gamma_final, T_final], axis=0)  # (2, H, W)
+
 
 
 
