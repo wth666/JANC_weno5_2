@@ -7,7 +7,6 @@ gas constant (R), enthalpy (h), specific heat ratio (gamma) and et al.
 dependencies: jax & cantera(python version)
 """
 
-import jax
 import jax.numpy as jnp
 from jax import vmap,lax,custom_vjp 
 from ..preprocess import nondim
@@ -137,9 +136,6 @@ def e_eqn(T, e, Y):
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
-import jax
-import jax.numpy as jnp
-from jax import lax
 
 @jax.custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
@@ -159,7 +155,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
         res = (h - R * T) - e
         return res
 
-    res_scan = jax.vmap(e_eqn_at_T)(T_scan)  # (101, 1, 1000, 600)
+    res_scan = vmap(e_eqn_at_T)(T_scan)  # (101, 1, 1000, 600)
     res_scan = res_scan[:, 0, :, :]  # (101, 1000, 600)
 
     sign_change = res_scan[:-1] * res_scan[1:] < 0  # (100, 1000, 600)
@@ -198,7 +194,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     def no_root_case():
         msg = "Error: no valid root found in get_T_nasa7."
-        jax.debug.print(msg)
+        #jax.debug.print(msg)
         #assert False, msg
         dummy = jnp.full_like(e, jnp.nan)
         return jnp.concatenate([dummy, dummy], axis=0)  # (2, 1000, 600), 保证shape与newton_solver一致
