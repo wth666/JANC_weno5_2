@@ -160,7 +160,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
             return jnp.concatenate([dummy_gamma, dummy_T], axis=0)
 
         def proceed_with_newton(valid_idx):
-            T0 = 0.5 * (T_scan[valid_idx] + T_scan[valid_idx + 1])
+            T0 = 0.5 * (jnp.take(T_scan, valid_idx) + jnp.take(T_scan, valid_idx + 1))
             initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(T0, e, Y)
 
             def cond_fun(args):
