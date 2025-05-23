@@ -15,7 +15,7 @@ from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
 
 
-max_iter = 5e10
+max_iter = 5
 tol = 5e-9
 
 species_M = None
@@ -165,6 +165,7 @@ def get_T_nasa7(e,Y,initial_T):
             return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
 
         def converged(_):
+            jax.debug.print("收敛了")
             return jnp.concatenate([gamma_final, T_final], axis=0)
 
         return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
