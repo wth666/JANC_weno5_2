@@ -276,7 +276,7 @@ def get_T_nasa7(e, Y, initial_T):
     T_right = base_T[valid_idx + 1]
     T0_scan = 0.5 * (T_left + T_right)  # (H, W)
 
-    T0_init = jnp.where(failed, T0_scan, initial_T[0])  # (H, W)
+    T0_init = T0_scan
     T0_init = T0_init[None, :, :]  # (1, H, W)
 
     # === 第三步：重新牛顿迭代 ===
