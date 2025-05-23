@@ -253,7 +253,7 @@ def get_T_nasa7(e, Y, initial_T):
             return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
 
         T_final, _ = lax.while_loop(cond_fun, body_fun, (T0, 0))
-        cp, gamma, *_ = get_thermo_nasa7(T_final, Y)
+        cp, gamma, h, *_ = get_thermo_nasa7(T_final, Y)
 
         res_check = (h - R * T_final) - e
         failed = jnp.any(jnp.abs(res_check) > tol, axis=0)  # (1000,600)
