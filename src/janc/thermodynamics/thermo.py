@@ -137,7 +137,7 @@ def e_eqn(T, e, Y):
     return res, dres_dT, ddres_dT2, gamma
 
 
-@jax.custom_vjp
+@custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
