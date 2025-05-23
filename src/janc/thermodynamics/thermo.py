@@ -230,8 +230,7 @@ def get_T_nasa7(e,Y,initial_T):
 
 
 @custom_vjp
-def get_T_nasa7(e, Y, initial_T, tol, max_iter, 
-                e_eqn, T_min, T_max, N_scan):
+def get_T_nasa7(e, Y, initial_T):
    
     # === 牛顿迭代内嵌 ===
     def solve_newton(T0, e, Y):
