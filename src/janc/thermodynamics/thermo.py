@@ -14,7 +14,7 @@ from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
 
 
-max_iter = 500
+max_iter = 5e10
 tol = 5e-9
 
 species_M = None
