@@ -142,13 +142,15 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
-    N_scan = 100  # 子区间个数
+    N_scan = 100
 
     T_scan = jnp.linspace(T_min, T_max, N_scan + 1)
 
+    # get_res 接收标量T
     def get_res(T_scalar):
-        # T_scalar 是标量，传入e_eqn时包装成1维数组
-        res, _, _, _ = e_eqn(jnp.array([T_scalar]), e, Y)
+        # 传入e_eqn一个长度为1的数组，保证T[0]是标量
+        T_input = jnp.array([T_scalar])  # shape (1,)
+        res, _, _, _ = e_eqn(T_input, e, Y)
         return res
 
     res_scan = jax.vmap(get_res)(T_scan)
@@ -166,6 +168,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
         def proceed_with_newton(valid_idx):
             T0 = 0.5 * (T_scan[valid_idx] + T_scan[valid_idx + 1])
+            # 同样传入长度为1数组
             initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(jnp.array([T0]), e, Y)
 
             def cond_fun(args):
@@ -202,6 +205,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
         return lax.cond(found, proceed_with_newton, no_root_found, valid_idx)
 
     return find_valid_T0(None)
+
 
 
     
