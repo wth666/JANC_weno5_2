@@ -132,8 +132,12 @@ def get_thermo_nasa7(T, Y):
 
 def e_eqn(T, e, Y):
     cp, gamma, h, R, dcp = get_thermo_nasa7(T, Y)
-    res = ((h - R*T) - e)
-    dres_dT = (cp - R)
+    #res = ((h - R*T) - e)
+    #dres_dT = (cp - R)
+    #ddres_dT2 = dcp
+
+    res = h - e
+    dres_dT = cp
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
