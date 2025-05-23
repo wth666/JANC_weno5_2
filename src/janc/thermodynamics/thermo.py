@@ -199,7 +199,8 @@ def get_T_nasa7(e, Y, initial_T_unused):
         dummy = jnp.full_like(e, jnp.nan)
         return jnp.concatenate([dummy, dummy], axis=0)  # (2, 1000, 600), 保证shape与newton_solver一致
 
-    return lax.cond(jnp.any(found), lambda _: newton_solver(T0), lambda _: no_root_case(), operand=None)
+    #return lax.cond(jnp.any(found), lambda _: newton_solver(T0), lambda _: no_root_case(), operand=None)
+    return newton_solver(T0)
 
 
 
