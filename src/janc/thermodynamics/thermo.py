@@ -139,76 +139,62 @@ def e_eqn(T, e, Y):
 
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
-
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
-    N_scan = 100  # 子区间个数
-    tol = 1e-8
-    max_iter = 100
+    N_scan = 100
+    tol = 1e-6
+    max_iter = 20
 
-    T_scan = jnp.linspace(T_min, T_max, N_scan + 1)
+    spatial_shape = e.shape  # e.shape == (1000, 600) 假设
+    scan_shape = (N_scan + 1,) + spatial_shape
 
-    # 包装e_eqn，保证传入的是长度为1的数组
-    def e_eqn_wrapped(T_scalar, e, Y):
-        T_array = jnp.array([T_scalar])
-        return e_eqn(T_array, e, Y)
+    T_scan = jnp.linspace(T_min, T_max, N_scan + 1).reshape(-1, 1, 1)  # shape: (N_scan+1, 1, 1)
+    T_scan = jnp.broadcast_to(T_scan, scan_shape)                     # shape: (N_scan+1, 1000, 600)
 
-    def get_res(T_scalar):
-        res, _, _, _ = e_eqn_wrapped(T_scalar, e, Y)
-        return res
+    def e_eqn_at_T(T):
+        T = jnp.expand_dims(T, axis=0)  # shape: (1, 1000, 600)
+        return e_eqn(T, e, Y)[0]        # only residual
 
-    res_scan = jax.vmap(get_res)(T_scan)
+    res_scan = jax.vmap(e_eqn_at_T)(T_scan)  # shape: (N_scan+1, 1000, 600)
 
     def find_valid_T0(_):
-        # 查找符号变化区间
-        sign_change = res_scan[:-1] * res_scan[1:] < 0
-        valid_idx = jnp.where(sign_change, size=1, fill_value=-1)[0]
-        found = valid_idx != -1
+        sign_change = res_scan[:-1] * res_scan[1:] < 0  # shape: (N_scan, 1000, 600)
+        valid_idx = jnp.argmax(sign_change, axis=0)     # shape: (1000, 600)
+        found = jnp.any(sign_change, axis=0)            # shape: (1000, 600)
 
-        def no_root_found(_):
-            jax.debug.print("get_T_nasa7：在 [{}, {}] 中所有子区间无零点", T_min, T_max)
-            dummy_gamma = jnp.full_like(Y, jnp.nan)
-            dummy_T = jnp.array([jnp.nan])
-            return jnp.concatenate([dummy_gamma, dummy_T], axis=0)
+        T_lower = jnp.take_along_axis(T_scan, valid_idx[None], axis=0)[0]        # shape: (1000, 600)
+        T_upper = jnp.take_along_axis(T_scan, (valid_idx + 1)[None], axis=0)[0]  # shape: (1000, 600)
+        T0 = 0.5 * (T_lower + T_upper)
+        T0 = jnp.expand_dims(T0, axis=0)  # shape: (1, 1000, 600)
 
-        def proceed_with_newton(valid_idx):
-            T0 = 0.5 * (T_scan[valid_idx] + T_scan[valid_idx + 1])
-            initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn_wrapped(T0, e, Y)
+        res, de_dT, d2e_dT2, gamma = e_eqn(T0, e, Y)
 
-            def cond_fun(args):
-                res, de_dT, d2e_dT2, T, gamma, i = args
-                return (jnp.abs(res) > tol) & (i < max_iter)
+        def cond(args):
+            res, _, _, _, _, i = args
+            return (jnp.abs(res) > tol).any() & (i < max_iter)
 
-            def body_fun(args):
-                res, de_dT, d2e_dT2, T, gamma, i = args
-                delta_T = -res / (de_dT + 1e-12)
-                delta_T = jnp.clip(delta_T, -0.5, 0.5)
-                T_new = jnp.clip(T + delta_T, T_min, T_max)
-                res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn_wrapped(T_new, e, Y)
-                return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
+        def body(args):
+            res, de_dT, d2e_dT2, T, gamma, i = args
+            delta_T = -res / (de_dT + 1e-12)
+            delta_T = jnp.clip(delta_T, -0.5, 0.5)
+            T_new = jnp.clip(T + delta_T, T_min, T_max)
+            res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e, Y)
+            return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
-            initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, T0, initial_gamma, 0)
-            final_res, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond_fun, body_fun, initial_state)
+        init_state = (res, de_dT, d2e_dT2, T0, gamma, 0)
+        res_final, _, _, T_final, gamma_final, final_iter = lax.while_loop(cond, body, init_state)
 
-            def check_convergence(args):
-                final_res, T_final, gamma_final, final_iter = args
+        def if_not_found(_):
+            dummy = jnp.full_like(gamma_final, jnp.nan)
+            return jnp.concatenate([dummy, dummy], axis=0)
 
-                def not_converged(_):
-                    jax.debug.print("get_T_nasa7 未收敛：迭代达到最大次数 ({})", max_iter)
-                    return jnp.nan * jnp.concatenate([gamma_final, T_final], axis=0)
+        def if_found(_):
+            return jnp.concatenate([gamma_final, T_final], axis=0)
 
-                def converged(_):
-                    max_res = jnp.abs(final_res)
-                    jax.debug.print("get_T_nasa7 收敛，最大残差: {}", max_res)
-                    return jnp.concatenate([gamma_final, T_final], axis=0)
-
-                return lax.cond(final_iter >= max_iter, not_converged, converged, operand=None)
-
-            return check_convergence((final_res, T_final, gamma_final, final_iter))
-
-        return lax.cond(found, proceed_with_newton, no_root_found, valid_idx)
+        return jnp.where(found, if_found(None), if_not_found(None))
 
     return find_valid_T0(None)
+
 
 
 
