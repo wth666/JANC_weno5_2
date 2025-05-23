@@ -7,6 +7,7 @@ gas constant (R), enthalpy (h), specific heat ratio (gamma) and et al.
 dependencies: jax & cantera(python version)
 """
 
+import jax
 import jax.numpy as jnp
 from jax import vmap,lax,custom_vjp 
 from ..preprocess import nondim
