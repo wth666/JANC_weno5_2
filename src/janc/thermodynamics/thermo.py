@@ -219,9 +219,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 #import jax
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
-    #max_iter = 5000
-    #tol = 1e-3
-    #initial_T = jnp.ones_like(initial_T)
+
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
@@ -241,7 +239,7 @@ def get_T_nasa7(e,Y,initial_T):
     initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
     _, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
     # 限制最小温度
-    #T_final = jnp.clip(T_final, a_min=0.2, a_max = 20)
+    T_final = jnp.clip(T_final, a_min=T_min, a_max = T_max)
     #def print_warning(_):
         #debug.print("get_T_nasa7: 超过最大迭代步数")
         #return 0  # 返回一个占位值
