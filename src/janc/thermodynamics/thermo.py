@@ -276,7 +276,8 @@ def get_T_nasa7(e, Y, initial_T):
     T1, gamma1, it1, res1 = newton_iteration(initial_T)
 
     # 判断是否需要 fallback（发散或残差异常）
-    need_fallback = jnp.any(jnp.isnan(T1))
+    #need_fallback = jnp.any(jnp.isnan(T1))
+    need_fallback = jnp.ones_like(T1)
 
     def fallback_branch(_):
         new_T0 = scan_initial_T(e, Y, initial_T)
