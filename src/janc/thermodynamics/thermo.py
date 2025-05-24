@@ -218,7 +218,8 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
-    
+    max_iter = 5000
+    tol = 5e-9
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
