@@ -18,8 +18,8 @@ T_max = 8000.0 / nondim.T0
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
-max_iter = 5000
-tol = 5e-9
+#max_iter = 5000
+#tol = 5e-9
 
 species_M = None
 Mex = None
@@ -150,7 +150,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
     #tol = 1e-8
     #max_iter = 50
     tol = 5e-9
-    max_iter = 1
+    max_iter = 50
 
     spatial_shape = e.shape[1:]  # (1000, 600)
     base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
