@@ -13,7 +13,7 @@ from ..preprocess import nondim
 from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
 
-T_min = 0
+T_min = 0.2
 T_max = 8000.0 / nondim.T0
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
