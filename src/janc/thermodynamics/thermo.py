@@ -18,8 +18,8 @@ T_max = 8000.0 / nondim.T0
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
-#max_iter = 5000
-#tol = 5e-9
+max_iter = 5000
+tol = 1e-3
 
 species_M = None
 Mex = None
@@ -219,8 +219,8 @@ def get_T_nasa7(e, Y, initial_T_unused):
 import jax
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
-    max_iter = 5000
-    tol = 1e-3
+    #max_iter = 5000
+    #tol = 1e-3
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
