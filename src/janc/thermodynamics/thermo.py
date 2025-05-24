@@ -262,7 +262,7 @@ def get_T_nasa7(e, Y, initial_T):
         def body_fun(args):
             res, de_dT, d2e_dT2, T, gamma, i = args
             delta_T = -2 * res * de_dT / (2 * jnp.power(de_dT, 2) - res * d2e_dT2)
-            delta_T = jnp.clip(alpha * delta_T, -max_delta_T, max_delta_T)  # 阻尼+裁剪
+            #delta_T = jnp.clip(alpha * delta_T, -max_delta_T, max_delta_T)  # 阻尼+裁剪
             T_new = T + delta_T
             res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e, Y)
             return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
