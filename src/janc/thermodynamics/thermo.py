@@ -15,7 +15,7 @@ import os
 
 T_min = 0
 T_max = 8000.0 / nondim.T0
-scan_N = 20  # number of scan intervals
+scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
 max_iter = 5000
@@ -232,8 +232,9 @@ def get_T_nasa7(e,Y,initial_T):
 
 def scan_initial_T(e, Y, T_center):
     # 生成 scan_N 个候选温度，维度变为 (scan_N, 1, 1000, 600)
-    T_offsets = jnp.linspace(-scan_span, scan_span, scan_N).reshape((-1, 1, 1, 1))
-    T_candidates = T_center[None,...] + T_offsets  # shape: (scan_N, 1, 1000, 600)
+    #T_offsets = jnp.linspace(-scan_span, scan_span, scan_N).reshape((-1, 1, 1, 1))
+    #T_candidates = T_center[None,...] + T_offsets  # shape: (scan_N, 1, 1000, 600)
+    T_candidates = jnp.linspace(Tmin, Tmax, scan_N).reshape((-1, 1, 1, 1))
 
     # 计算每个候选温度的残差
     def get_res(T):  # e_eqn 输出 (res, de_dT, d2e_dT2, gamma)
