@@ -226,7 +226,7 @@ def get_T_nasa7(e,Y,initial_T):
     def cond_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
         delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
-        return (jnp.max(jnp.abs(detaT/T)) > tol) & (i < max_iter)
+        return (jnp.max(jnp.abs(delta_T/T)) > tol) & (i < max_iter)
 
     def body_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
