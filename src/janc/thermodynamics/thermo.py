@@ -18,8 +18,8 @@ T_max = 20
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
-max_iter = 5e10
-tol = 1e-3
+max_iter = 5
+tol = 5e-9
 
 species_M = None
 Mex = None
@@ -225,13 +225,13 @@ def get_T_nasa7(e,Y,initial_T):
     def cond_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
         #delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
-        delta_T = -res/de_dT
-        return (jnp.max(jnp.abs(delta_T/T)) > tol) & (i < max_iter)
+        #delta_T = -res/de_dT
+        return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
 
     def body_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
-        #delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
-        delta_T = -res/de_dT
+        delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
+        #delta_T = -res/de_dT
         T_new = T + delta_T
         res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
         return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
