@@ -140,7 +140,7 @@ def e_eqn(T, e, Y):
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
-'''
+
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
     T_min = 0.2
@@ -205,7 +205,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     #return lax.cond(jnp.any(found), lambda _: newton_solver(T0), lambda _: no_root_case(), operand=None)
     return newton_solver(T0)
-'''
+
 
 '''
 @custom_vjp
@@ -229,7 +229,7 @@ def get_T_nasa7(e,Y,initial_T):
     return jnp.concatenate([gamma_final, T_final],axis=0)
 '''
 
-
+'''
 def scan_initial_T(e, Y, T_center):
     # 生成 scan_N 个候选温度，维度变为 (scan_N, 1, 1000, 600)
     #T_offsets = jnp.linspace(-scan_span, scan_span, scan_N).reshape((-1, 1, 1, 1))
@@ -288,7 +288,7 @@ def get_T_nasa7(e, Y, initial_T):
 
     #return lax.cond(need_fallback, fallback_branch, success_branch, operand=None)
     return fallback_branch()
-
+'''
 
 
 
