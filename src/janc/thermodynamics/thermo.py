@@ -247,8 +247,11 @@ def get_T_nasa7(e,Y,initial_T):
     def no_clip(T_final):
         return T_final
 
-    # 判断是否需要 clip
-    T_final = lax.cond((T_final < T_min) | (T_final > T_max),clip_if_needed,no_clip, operand=T_final)
+    # 使用 jnp.any 将布尔数组压缩为一个标量
+    condition = jnp.any((T_final < T_min) | (T_final > T_max))
+
+    # 传入 condition（布尔标量）给 lax.cond
+    T_final = lax.cond(condition, clip_if_needed, no_clip, operand=T_final)
 
     def print_warning(_):
         debug.print("get_T_nasa7: 超过最大迭代步数")
