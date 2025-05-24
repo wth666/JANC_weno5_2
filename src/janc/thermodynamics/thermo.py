@@ -140,7 +140,7 @@ def e_eqn(T, e, Y):
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
-
+import jax
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
     T_min = 0.2
