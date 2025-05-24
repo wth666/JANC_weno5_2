@@ -15,7 +15,7 @@ import os
 
 T_min = 0
 T_max = 8000.0 / nondim.T0
-N_scan = 20  # number of scan intervals
+scan_N = 20  # number of scan intervals
 scan_span = 0.2
 
 max_iter = 5000
