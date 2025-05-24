@@ -221,7 +221,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 def get_T_nasa7(e,Y,initial_T):
     #max_iter = 5000
     #tol = 1e-3
-    initial_T = jnp.ones_like(initial_T)
+    #initial_T = jnp.ones_like(initial_T)
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
@@ -234,14 +234,14 @@ def get_T_nasa7(e,Y,initial_T):
         res, de_dT, d2e_dT2, T, gamma, i = args
         #delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
         delta_T = -res/de_dT
-        T_new = T + 0.1*delta_T
+        T_new = T + delta_T
         res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
         return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
     initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
     _, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
     # 限制最小温度
-    #T_final = jnp.clip(T_final, a_min=0.2)
+    T_final = jnp.clip(T_final, a_min=0.2)
     #def print_warning(_):
         #debug.print("get_T_nasa7: 超过最大迭代步数")
         #return 0  # 返回一个占位值
