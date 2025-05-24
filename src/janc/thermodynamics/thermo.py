@@ -18,7 +18,7 @@ T_max = 8000.0 / nondim.T0
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
-max_iter = 5000
+max_iter = 5e10
 tol = 1e-3
 
 species_M = None
