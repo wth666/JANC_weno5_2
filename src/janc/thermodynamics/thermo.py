@@ -140,7 +140,7 @@ def e_eqn(T, e, Y):
     ddres_dT2 = dcp
     return res, dres_dT, ddres_dT2, gamma
 
-'''
+
 import jax
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
@@ -208,9 +208,9 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
     return lax.cond(jnp.any(found), lambda _: newton_solver(T0), lambda _: no_root_case(), operand=None)
     #return newton_solver(T0)
+
+
 '''
-
-
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
     
@@ -233,7 +233,7 @@ def get_T_nasa7(e,Y,initial_T):
     T_final = jnp.clip(T_final, a_min=0.2)
 
     return jnp.concatenate([gamma_final, T_final],axis=0)
-
+'''
 
 '''
 def scan_initial_T(e, Y, T_center):
