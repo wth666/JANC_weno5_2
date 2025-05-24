@@ -287,7 +287,7 @@ def get_T_nasa7(e, Y, initial_T):
         return jnp.concatenate([gamma1, T1], axis=0)
 
     #return lax.cond(need_fallback, fallback_branch, success_branch, operand=None)
-    return fallback_branch
+    return fallback_branch()
 
 
 
