@@ -220,7 +220,7 @@ import jax
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
     max_iter = 5000
-    tol = 5e-9
+    tol = 1e-3
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
@@ -230,7 +230,7 @@ def get_T_nasa7(e,Y,initial_T):
     def body_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
         delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
-        T_new = T + 0.01*delta_T
+        T_new = T + delta_T
         res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
         return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
