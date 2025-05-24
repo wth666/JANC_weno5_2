@@ -8,7 +8,7 @@ dependencies: jax & cantera(python version)
 """
 
 import jax.numpy as jnp
-from jax import vmap,lax,custom_vjp,debug
+from jax import vmap,lax,custom_vjp
 from ..preprocess import nondim
 from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
@@ -194,11 +194,11 @@ def get_T_nasa7(e, Y, initial_T_unused):
 
         T_final, _ = lax.while_loop(cond_fun, body_fun, (T0, 0))
         cp, gamma, *_ = get_thermo_nasa7(T_final, Y)
-        return jnp.concatenate([gamma, T_final], axis=0)  # (9+1, 1000, 600)
+        return jnp.concatenate([gamma, T_final], axis=0)  
 
     def no_root_case():
         msg = "Error: no valid root found in get_T_nasa7."
-        debug.print(msg)
+        jax.debug.print(msg)
         #assert False, msg
         dummy = jnp.full_like(e, jnp.nan)
         return jnp.concatenate([dummy, dummy], axis=0)  # (2, 1000, 600), 保证shape与newton_solver一致
