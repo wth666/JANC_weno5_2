@@ -146,8 +146,8 @@ def get_T_nasa7(e, Y, initial_T_unused):
     T_min = 0.2
     T_max = 8000.0 / nondim.T0
     N_scan = 100  # number of scan intervals
-    #tol = 1e-8
-    #max_iter = 50
+    tol = 1e-8
+    max_iter = 50
 
     spatial_shape = e.shape[1:]  # (1000, 600)
     base_T_scan = jnp.linspace(T_min, T_max, N_scan + 1)  # (101,)
