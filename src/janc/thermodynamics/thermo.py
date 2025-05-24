@@ -14,7 +14,7 @@ from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
 
 T_min = 0.2
-T_max = 22
+T_max = 20
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
