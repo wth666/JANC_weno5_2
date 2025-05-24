@@ -195,7 +195,9 @@ def get_T_nasa7(e, Y, initial_T_unused):
             max_res = jnp.max(jnp.abs(res))
             return (max_res > tol) & (i < max_iter)
 
-        T_final, _ = lax.while_loop(cond_fun, body_fun, (T0, 0))
+        T_final, i_final = lax.while_loop(cond_fun, body_fun, (T0, 0))
+        if(i_final >= max_iter):
+            print("超过最大迭代步数")
         cp, gamma, *_ = get_thermo_nasa7(T_final, Y)
         return jnp.concatenate([gamma, T_final], axis=0)  
 
