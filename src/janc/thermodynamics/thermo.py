@@ -224,8 +224,8 @@ def get_T_nasa7(e,Y,initial_T):
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
-        res, de_dT, d2e_dT2, T, gamma, dT, i = args
-        return (jnp.max(jnp.abs(dT)) > tol) & (i < max_iter)
+        res, de_dT, d2e_dT2, T, gamma, i = args
+        return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
 
     def body_fun(args):
         res, de_dT, d2e_dT2, T, gamma, dT, i = args
@@ -233,10 +233,11 @@ def get_T_nasa7(e,Y,initial_T):
         T_new = T + delta_T
         dT  = delta_T/T
         res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
-        return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, dT, i + 1
+        res_new = delta_T/T
+        return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
-    initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0.0, 0)
-    _, _, _, T_final, gamma_final, _, it = lax.while_loop(cond_fun, body_fun, initial_state)
+    initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
+    _, _, _, T_final, gamma_final, it = lax.while_loop(cond_fun, body_fun, initial_state)
     # 限制最小温度
     #T_final = jnp.clip(T_final, a_min=0.2)
     #def print_warning(_):
