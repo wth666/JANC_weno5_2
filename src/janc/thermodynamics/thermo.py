@@ -13,9 +13,10 @@ from ..preprocess import nondim
 from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
 
-T_min = 0.2
+T_min = 0
 T_max = 8000.0 / nondim.T0
-N_scan = 100  # number of scan intervals
+N_scan = 20  # number of scan intervals
+scan_span = 0.2
 
 max_iter = 5000
 tol = 5e-9
@@ -229,65 +230,62 @@ def get_T_nasa7(e,Y,initial_T):
 '''
 
 
-@custom_vjp
+def scan_initial_T(e, Y, T_center):
+    # 生成 scan_N 个候选温度，维度变为 (scan_N, 1, 1000, 600)
+    T_offsets = jnp.linspace(-scan_span, scan_span, scan_N).reshape((-1, 1, 1, 1))
+    T_candidates = T_center + T_offsets  # shape: (scan_N, 1, 1000, 600)
+
+    # 计算每个候选温度的残差
+    def get_res(T):  # e_eqn 输出 (res, de_dT, d2e_dT2, gamma)
+        res, _, _, _ = e_eqn(T, e, Y)
+        return jnp.abs(res)
+
+    res_list = jax.vmap(get_res)(T_candidates)  # shape: (scan_N, 1, 1000, 600)
+    
+    # 找到每个点在 scan_N 中最小残差的索引
+    best_idx = jnp.argmin(res_list, axis=0)  # shape: (1, 1000, 600)
+
+    # 从 T_candidates 中选择最优的温度，使用 jnp.take_along_axis
+    best_T = jnp.take_along_axis(T_candidates, best_idx[None, ...], axis=0).squeeze(0)
+    return best_T  # shape: (1, 1000, 600)
+
+# 主函数
 def get_T_nasa7(e, Y, initial_T):
-    spatial_shape = e.shape[1:]  # (H, W)
 
-    # === 牛顿迭代内嵌 ===
-    def solve_newton(T0, e, Y):
-        def body_fun(val):
-            T, _ = val
-            res, dres, _, gamma = e_eqn(T, e, Y)
-            delta = res / (dres + 1e-10)
-            T_next = T - delta
-            return (T_next, gamma)
+    def newton_iteration(T0):
+        res, de_dT, d2e_dT2, gamma = e_eqn(T0, e, Y)
 
-        def cond_fun(val):
-            T, _ = val
-            res, *_ = e_eqn(T, e, Y)
-            err = jnp.max(jnp.abs(res))
-            return err > tol
+        def cond_fun(args):
+            res, de_dT, d2e_dT2, T, gamma, i = args
+            return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
 
-        def newton_loop(T_init):
-            val = (T_init, jnp.zeros_like(T_init))
-            val = lax.while_loop(cond_fun, body_fun, val)
-            return val  # (T_final, gamma)
+        def body_fun(args):
+            res, de_dT, d2e_dT2, T, gamma, i = args
+            delta_T = -2 * res * de_dT / (2 * jnp.power(de_dT, 2) - res * d2e_dT2)
+            delta_T = jnp.clip(alpha * delta_T, -max_delta_T, max_delta_T)  # 阻尼+裁剪
+            T_new = T + delta_T
+            res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new, e, Y)
+            return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
-        # vmap over batch (channel, H, W)
-        T_final, gamma_final = newton_loop(T0)
-        return T_final, gamma_final
+        init_state = (res, de_dT, d2e_dT2, T0, gamma, 0)
+        res_final, _, _, T_final, gamma_final, iters = lax.while_loop(cond_fun, body_fun, init_state)
+        return T_final, gamma_final, iters, res_final
 
+    # 第一次尝试
+    T1, gamma1, it1, res1 = newton_iteration(initial_T)
 
-    # === 扫描构造新的 T 初值 ===
-    base_T = jnp.linspace(T_min, T_max, N_scan + 1)  # (N_scan+1,)
+    # 判断是否需要 fallback（发散或残差异常）
+    need_fallback = jnp.any(jnp.isnan(T1))
 
-    def compute_res(T_scalar):
-        T_full = jnp.ones((1, *spatial_shape)) * T_scalar
-        res, *_ = e_eqn(T_full, e, Y)
-        return res  # (1, H, W)
+    def fallback_branch(_):
+        new_T0 = scan_initial_T(e, Y, initial_T)
+        T2, gamma2, _, _ = newton_iteration(new_T0)
+        return jnp.concatenate([gamma2, T2], axis=0)
 
-    res_scan = vmap(compute_res)(base_T)  # (N_scan+1, 1, H, W)
-    res_scan = res_scan[:, 0, :, :]  # (N_scan+1, H, W)
+    def success_branch(_):
+        return jnp.concatenate([gamma1, T1], axis=0)
 
-    sign_change = (res_scan[:-1] * res_scan[1:] < 0)
-    valid_idx = jnp.argmax(sign_change, axis=0)  # (H, W)
-
-    T_left = base_T[valid_idx]
-    T_right = base_T[valid_idx + 1]
-    T0_scan = 0.5 * (T_left + T_right)  # (H, W)
-
-    T0_init = T0_scan
-    T0_init = T0_init[None, :, :]  # (1, H, W)
-
-    # === 第三步：重新牛顿迭代 ===
-    T_refined, gamma_refined = solve_newton(T0_init, e, Y)
-
-    # === 第四步：合并结果 ===
-    gamma_final =  gamma_refined
-    T_final = T_refined
-
-    return jnp.concatenate([gamma_final, T_final], axis=0)  # (2, H, W)
-
+    return lax.cond(need_fallback, fallback_branch, success_branch, operand=None)
 
 
 
