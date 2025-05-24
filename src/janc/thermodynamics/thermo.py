@@ -248,7 +248,8 @@ def get_T_nasa7(e,Y,initial_T):
         return T_final
 
     # 使用 jnp.any 将布尔数组压缩为一个标量
-    condition = jnp.any((T_final < T_min) | (T_final > T_max))
+    #condition = jnp.any((T_final < T_min) | (T_final > T_max))
+    condition = jnp.any((T_final < 0))
 
     # 传入 condition（布尔标量）给 lax.cond
     T_final = lax.cond(condition, clip_if_needed, no_clip, operand=T_final)
