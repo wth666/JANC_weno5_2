@@ -242,6 +242,7 @@ def get_T_nasa7(e,Y,initial_T):
     #T_final = jnp.clip(T_final, a_min=T_min, a_max = T_max)
     def clip_if_needed(T_final):
         debug.print("get_T_nasa7: T_final 超出范围，执行 clip 操作")
+        debug.print("min index: {}", jnp.argmin(T_final))
         return jnp.clip(T_final, a_min=T_min, a_max=T_max)
 
     def no_clip(T_final):
