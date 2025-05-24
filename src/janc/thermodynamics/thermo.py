@@ -240,7 +240,7 @@ def scan_initial_T(e, Y, T_center):
         res, _, _, _ = e_eqn(T, e, Y)
         return jnp.abs(res)
 
-    res_list = jax.vmap(get_res)(T_candidates)  # shape: (scan_N, 1, 1000, 600)
+    res_list = vmap(get_res)(T_candidates)  # shape: (scan_N, 1, 1000, 600)
     
     # 找到每个点在 scan_N 中最小残差的索引
     best_idx = jnp.argmin(res_list, axis=0)  # shape: (1, 1000, 600)
