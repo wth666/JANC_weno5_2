@@ -196,8 +196,11 @@ def get_T_nasa7(e, Y, initial_T_unused):
             return (max_res > tol) & (i < max_iter)
 
         T_final, i_final = lax.while_loop(cond_fun, body_fun, (T0, 0))
-        if(i_final >= max_iter):
-            jax.debug.print("超过最大迭代步数")
+        def print_warning(_):
+            jax.debug.print("get_T_nasa7: 超过最大迭代步数")
+            return 0  # 返回一个占位值
+
+        lax.cond(i_final >= max_iter, print_warning, lambda _: 0, operand=None)
         cp, gamma, *_ = get_thermo_nasa7(T_final, Y)
         return jnp.concatenate([gamma, T_final], axis=0)  
 
