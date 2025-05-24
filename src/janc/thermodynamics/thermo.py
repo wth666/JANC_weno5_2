@@ -278,12 +278,12 @@ def get_T_nasa7(e, Y, initial_T):
     # 判断是否需要 fallback（发散或残差异常）
     need_fallback = jnp.any(jnp.isnan(T1))
 
-    def fallback_branch(_):
+    def fallback_branch():
         new_T0 = scan_initial_T(e, Y, initial_T)
         T2, gamma2, _, _ = newton_iteration(new_T0)
         return jnp.concatenate([gamma2, T2], axis=0)
 
-    def success_branch(_):
+    def success_branch():
         return jnp.concatenate([gamma1, T1], axis=0)
 
     #return lax.cond(need_fallback, fallback_branch, success_branch, operand=None)
