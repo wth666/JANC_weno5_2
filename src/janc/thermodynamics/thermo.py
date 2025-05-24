@@ -8,7 +8,7 @@ dependencies: jax & cantera(python version)
 """
 
 import jax.numpy as jnp
-from jax import vmap,lax,custom_vjp
+from jax import vmap,lax,custom_vjp,debug
 from ..preprocess import nondim
 from ..preprocess.load import read_reaction_mechanism, get_cantera_coeffs
 import os
@@ -216,7 +216,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 '''
 
 
-import jax
+#import jax
 @custom_vjp
 def get_T_nasa7(e,Y,initial_T):
     #max_iter = 5000
@@ -239,7 +239,7 @@ def get_T_nasa7(e,Y,initial_T):
     # 限制最小温度
     #T_final = jnp.clip(T_final, a_min=0.2)
     def print_warning(_):
-        jax.debug.print("get_T_nasa7: 超过最大迭代步数")
+        debug.print("get_T_nasa7: 超过最大迭代步数")
         return 0  # 返回一个占位值
     lax.cond(it >= max_iter, print_warning, lambda _: 0, operand=None)
     return jnp.concatenate([gamma_final, T_final],axis=0)
