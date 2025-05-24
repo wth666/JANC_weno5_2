@@ -144,7 +144,7 @@ def e_eqn(T, e, Y):
 import jax
 @custom_vjp
 def get_T_nasa7(e, Y, initial_T_unused):
-    T_min = 0.2
+    T_min = 10
     T_max = 8000.0 / nondim.T0
     N_scan = 100  # number of scan intervals
     #tol = 1e-8
