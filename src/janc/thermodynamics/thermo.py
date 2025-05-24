@@ -233,7 +233,7 @@ def get_T_nasa7(e,Y,initial_T):
 def scan_initial_T(e, Y, T_center):
     # 生成 scan_N 个候选温度，维度变为 (scan_N, 1, 1000, 600)
     T_offsets = jnp.linspace(-scan_span, scan_span, scan_N).reshape((-1, 1, 1, 1))
-    T_candidates = T_center + T_offsets  # shape: (scan_N, 1, 1000, 600)
+    T_candidates = T_center[None,...] + T_offsets  # shape: (scan_N, 1, 1000, 600)
 
     # 计算每个候选温度的残差
     def get_res(T):  # e_eqn 输出 (res, de_dT, d2e_dT2, gamma)
