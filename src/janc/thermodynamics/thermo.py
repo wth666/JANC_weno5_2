@@ -225,14 +225,14 @@ def get_T_nasa7(e,Y,initial_T):
 
     def cond_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
-        return (jnp.max(jnp.abs(res)) > tol) & (i < max_iter)
+        delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
+        return (jnp.max(jnp.abs(detaT/T)) > tol) & (i < max_iter)
 
     def body_fun(args):
         res, de_dT, d2e_dT2, T, gamma, i = args
         delta_T = -2*res*de_dT/(2*jnp.power(de_dT,2)-res*d2e_dT2)
         T_new = T + delta_T
         res_new, de_dT_new, d2e_dT2_new, gamma_new = e_eqn(T_new,e,Y)
-        res_new = delta_T/T
         return res_new, de_dT_new, d2e_dT2_new, T_new, gamma_new, i + 1
 
     initial_state = (initial_res, initial_de_dT, initial_d2e_dT2, initial_T, initial_gamma, 0)
