@@ -249,7 +249,7 @@ def scan_initial_T(e, Y, T_center):
     best_T = jnp.take_along_axis(T_candidates, best_idx[None, ...], axis=0).squeeze(0)
     return best_T  # shape: (1, 1000, 600)
 
-# 主函数
+@custom_vjp
 def get_T_nasa7(e, Y, initial_T):
 
     def newton_iteration(T0):
