@@ -221,7 +221,7 @@ def get_T_nasa7(e, Y, initial_T_unused):
 def get_T_nasa7(e,Y,initial_T):
     #max_iter = 5000
     #tol = 1e-3
-    initial_T = ones_like(initial_T)
+    initial_T = jnp.ones_like(initial_T)
     initial_res, initial_de_dT, initial_d2e_dT2, initial_gamma = e_eqn(initial_T,e,Y)
 
     def cond_fun(args):
