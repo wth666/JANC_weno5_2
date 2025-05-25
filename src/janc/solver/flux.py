@@ -36,7 +36,7 @@ def splitFlux_LF_w(ixy, U, aux):
     F = zx*jnp.concatenate([rho * u, rho * u ** 2 + p, rho * u * v, u * (rhoE + p)], axis=0) + zy*jnp.concatenate([rho * v, rho * u * v, rho * v ** 2 + p, v * (rhoE + p)], axis=0)
     um = jnp.nanmax(abs(u) + a)
     vm = jnp.nanmax(abs(v) + a)
-    theta = 1.2*(zx*um + zy*vm)
+    theta = 0.8*(zx*um + zy*vm)
     #theta = zx * (jnp.abs(u) + a) + zy * (jnp.abs(v) + a)
     Hplus = 0.5 * (F + theta * U[0:4,:,:])
     Hminus = 0.5 * (F - theta * U[0:4,:,:])
