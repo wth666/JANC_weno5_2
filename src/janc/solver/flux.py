@@ -369,7 +369,7 @@ def weno5_amr(field,dx,dy):
 
 
 @jit
-def WENO_R_x(f):
+def WENO_L_x(f):
     fj = f[:,2:-3,3:-3]
     fjp1 = f[:,3:-2,3:-3]
     fjp2 = f[:,4:-1,3:-3]
@@ -398,7 +398,7 @@ def WENO_R_x(f):
     return fj_halfp
 
 @jit
-def WENO_R_y(f):
+def WENO_L_y(f):
 
     fj = f[:,3:-3,2:-3]
     fjp1 = f[:,3:-3,3:-2]
@@ -428,7 +428,7 @@ def WENO_R_y(f):
     return fj_halfp
 
 @jit
-def WENO_L_x(f):
+def WENO_R_x(f):
 
     fj = f[:,3:-2,3:-3]
     fjp1 = f[:,4:-1,3:-3]
@@ -458,7 +458,7 @@ def WENO_L_x(f):
     return fj_halfm
 
 @jit
-def WENO_L_y(f):
+def WENO_R_y(f):
 
     fj = f[:,3:-3,3:-2]
     fjp1 = f[:,3:-3,4:-1]
@@ -555,7 +555,7 @@ def weno5_HLLC(U, aux, dx, dy):
     rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
     e = U[3:4]/U[0:1] - 0.5*(u**2+v**2)
     Y = U[4:]/U[0:1]
-    var_p = jnp.concatenate([rho, u, v, e, p, Y], axis=0)
+    var_p = jnp.concatenate([rho, u, v, p, e, Y], axis=0)
     
     var_p_l = WENO_L_x(var_p)
     var_p_r = WENO_R_x(var_p)
