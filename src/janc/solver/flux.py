@@ -368,7 +368,7 @@ def weno5_amr(field,dx,dy):
 
 
 @jit
-def WENO_R_x(f):
+def WENO_L_x(f):
     fj = f[:,2:-3,3:-3]
     fjp1 = f[:,3:-2,3:-3]
     fjp2 = f[:,4:-1,3:-3]
@@ -397,7 +397,7 @@ def WENO_R_x(f):
     return fj_halfp
 
 @jit
-def WENO_R_y(f):
+def WENO_L_y(f):
 
     fj = f[:,3:-3,2:-3]
     fjp1 = f[:,3:-3,3:-2]
@@ -427,7 +427,7 @@ def WENO_R_y(f):
     return fj_halfp
 
 @jit
-def WENO_L_x(f):
+def WENO_R_x(f):
 
     fj = f[:,3:-2,3:-3]
     fjp1 = f[:,4:-1,3:-3]
@@ -457,7 +457,7 @@ def WENO_L_x(f):
     return fj_halfm
 
 @jit
-def WENO_L_y(f):
+def WENO_R_y(f):
 
     fj = f[:,3:-3,3:-2]
     fjp1 = f[:,3:-3,4:-1]
