@@ -393,8 +393,8 @@ def WENO_L_x(f):
     fj_halfp3 = 1 / 3 * fj + 5 / 6 * fjp1 - 1 / 6 * fjp2
 
     fj_halfp = w1 * fj_halfp1 + w2 * fj_halfp2 + w3 * fj_halfp3
-    dfj = fj_halfp[:,1:,:] - fj_halfp[:,0:-1,:]
-    return dfj
+
+    return fj_halfp
 
 @jit
 def WENO_L_y(f):
@@ -423,9 +423,8 @@ def WENO_L_y(f):
     fj_halfp3 = 1 / 3 * fj + 5 / 6 * fjp1 - 1 / 6 * fjp2
 
     fj_halfp = w1 * fj_halfp1 + w2 * fj_halfp2 + w3 * fj_halfp3
-    dfj = fj_halfp[:,:,1:] - fj_halfp[:,:,0:-1]
 
-    return dfj
+    return fj_halfp
 
 @jit
 def WENO_R_x(f):
@@ -454,9 +453,8 @@ def WENO_R_x(f):
     fj_halfm3 = 1 / 3 * fj + 5 / 6 * fjm1 - 1 / 6 * fjm2
 
     fj_halfm = w1 * fj_halfm1 + w2 * fj_halfm2 + w3 * fj_halfm3
-    dfj = (fj_halfm[:,1:,:] - fj_halfm[:,0:-1,:])
 
-    return dfj
+    return fj_halfm
 
 @jit
 def WENO_R_y(f):
@@ -485,9 +483,8 @@ def WENO_R_y(f):
     fj_halfm3 = 1 / 3 * fj + 5 / 6 * fjm1 - 1 / 6 * fjm2
 
     fj_halfm = w1 * fj_halfm1 + w2 * fj_halfm2 + w3 * fj_halfm3
-    dfj = (fj_halfm[:,:,1:] - fj_halfm[:,:,0:-1])
 
-    return dfj
+    return fj_halfm
 
 
 
@@ -556,15 +553,15 @@ def weno5_HLLC(U, aux, dx, dy):
 
     Ul = WENO_L_x(U)
     Ur = WENO_R_x(U)
-    aux_l = WENO_L_x(aux)
-    aux_r = WENO_R_x(aux)
+    aux_l = aux_func.update_aux(Ul, aux)
+    aux_r = aux_func.update_aux(Ur, aux)
     flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
     dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
 
     Ul = WENO_L_y(U)
     Ur = WENO_R_y(U)
-    aux_l = WENO_L_y(aux)
-    aux_r = WENO_R_y(aux)
+    aux_l = aux_func.update_aux(Ul, aux)
+    aux_r = aux_func.update_aux(Ur, aux)
     flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
     dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
 
