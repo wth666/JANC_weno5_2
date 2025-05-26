@@ -550,22 +550,53 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
 
 @jit
 def weno5_HLLC(U, aux, dx, dy):
-
-    Ul = WENO_L_x(U)
-    Ur = WENO_R_x(U)
-    auxl = WENO_L_x(aux)
-    auxr = WENO_R_x(aux)
-    aux_l = aux_func.update_aux(Ul, auxl)
-    aux_r = aux_func.update_aux(Ur, auxr)
+    
+    rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
+    e = U[3:4]/U[0:1] - 0.5*(u**2+v**2)
+    Y = U[4:]/U[0:1]
+    var_p = jnp.concatenate([rho, u, v, p, e, Y], axis=0)
+    
+    var_p_l = WENO_L_x(var_p)
+    var_p_r = WENO_R_x(var_p)
+    
+    rho_l = var_p_l[0:1]
+    u_l = var_p_l[1:2]
+    v_l = var_p_l[2:3]
+    p_l = var_p_l[3:4]
+    e_l = var_p_l[4:5]
+    Y_l = var_p_l[5:]
+    rho_r = var_p_r[0:1]
+    u_r = var_p_r[1:2]
+    v_r = var_p_r[2:3]
+    p_r = var_p_r[3:4]
+    e_r = var_p_r[4:5]
+    Y_r = var_p_r[5:]
+    Ul = jnp.concatenate([rho_l, rho_l*u_l, rho_l*v_l, rho_l*(e_l+0.5*(u_l**2+v_l**2)), rho_l*Y_l],axis=0)
+    Ur = jnp.concatenate([rho_R, rho_R*u_R, rho_R*v_R, rho_R*(e_R+0.5*(u_R**2+v_R**2)), rho_R*Y_R],axis=0)
+    aux_l = aux_func.update_aux(Ul, aux)
+    aux_r = aux_func.update_aux(Ur, aux)
     flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
     dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
 
-    Ul = WENO_L_y(U)
-    Ur = WENO_R_y(U)
-    auxl = WENO_L_y(aux)
-    auxr = WENO_R_y(aux)
-    aux_l = aux_func.update_aux(Ul, auxl)
-    aux_r = aux_func.update_aux(Ur, auxr)
+    var_p_l = WENO_L_y(var_p)
+    var_p_r = WENO_R_y(var_p)
+    
+    rho_l = var_p_l[0:1]
+    u_l = var_p_l[1:2]
+    v_l = var_p_l[2:3]
+    p_l = var_p_l[3:4]
+    e_l = var_p_l[4:5]
+    Y_l = var_p_l[5:]
+    rho_r = var_p_r[0:1]
+    u_r = var_p_r[1:2]
+    v_r = var_p_r[2:3]
+    p_r = var_p_r[3:4]
+    e_r = var_p_r[4:5]
+    Y_r = var_p_r[5:]
+    Ul = jnp.concatenate([rho_l, rho_l*u_l, rho_l*v_l, rho_l*(e_l+0.5*(u_l**2+v_l**2)), rho_l*Y_l],axis=0)
+    Ur = jnp.concatenate([rho_R, rho_R*u_R, rho_R*v_R, rho_R*(e_R+0.5*(u_R**2+v_R**2)), rho_R*Y_R],axis=0)
+    aux_l = aux_func.update_aux(Ul, aux)
+    aux_r = aux_func.update_aux(Ur, aux)
     flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
     dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
 
