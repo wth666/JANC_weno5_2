@@ -494,8 +494,8 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
     rhoL, uL, vL, YL, pL, aL = aux_func.U_to_prim(Ul, aux_l)
     rhoR, uR, vR, YR, pR, aR = aux_func.U_to_prim(Ur, aux_r)
 
-    EL = Ul[3] / rhoL
-    ER = Ur[3] / rhoR
+    EL = Ul[3:4] / rhoL
+    ER = Ur[3:4] / rhoR
 
     # 用 ixy 控制提取的方向变量，避免 if
     u_nL = jnp.where(ixy == 1, uL, vL)
@@ -519,8 +519,8 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
     # 定义星区状态函数
     def U_star(U, rho, u_n, tang, S, S_star, p, side):
         factor = rho * (S - u_n) / (S - S_star + 1e-6)
-        E = U[3] / rho
-        Y = U[4] / rho
+        E = U[3：4] / rho
+        Y = U[4:] / rho
 
         # 构造星区守恒变量
         Ust = jnp.stack([
