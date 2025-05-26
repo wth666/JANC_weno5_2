@@ -554,7 +554,7 @@ def weno5_HLLC(U, aux, dx, dy):
     rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
     e = U[3:4]/U[0:1] - 0.5*(u**2+v**2)
     Y = U[4:]/U[0:1]
-    var_p = jnp.concatenate([rho, u, v, p, e, Y], axis=0)
+    var_p = jnp.concatenate([rho, u, v, e, Y], axis=0)
     
     var_p_l = WENO_L_x(var_p)
     var_p_r = WENO_R_x(var_p)
