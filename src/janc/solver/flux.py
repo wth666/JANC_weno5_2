@@ -596,7 +596,17 @@ def weno5_HLLC(U, aux, dx, dy):
 
     return -netflux
 
+@jit
+def flux(U, aux, ixy):
+    rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
+    rhoE = U[3:4,:,:]
 
+    zx = (ixy == 1) * 1
+    zy = (ixy == 2) * 1
+
+    F = zx*jnp.concatenate([rho * u, rho * u ** 2 + p, rho * u * v, u * (rhoE + p), rho * u * Y], axis=0) + zy*jnp.concatenate([rho * v, rho * u * v, rho * v ** 2 + p, v * (rhoE + p), rho * v * Y], axis=0)
+    
+    return F
 
 
 
