@@ -575,7 +575,7 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
 
     return flux_out
 
-
+@jit
 def weno5_HLLC(U, aux, dx, dy):
 
     Ul = WENO_L_x(U)
