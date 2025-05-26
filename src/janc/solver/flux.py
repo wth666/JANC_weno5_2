@@ -493,68 +493,55 @@ def WENO_R_y(f):
 
 @jit
 def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
-    """
-    Compute HLLC flux given left and right conservative variables and auxiliary info.
-
-    Ul, Ur: shape (5, Nx, Ny)  # [rho, rho*u, rho*v, rho*E, rho*Y]
-    aux_l, aux_r: contain (rho, u, v, p, a) or similar
-    ixy: 1 for x-direction, 2 for y-direction
-    """
-
-    # 提取左右状态变量
+    # 提取左右状态
     rhoL, uL, vL, YL, pL, aL = aux_func.U_to_prim(Ul, aux_l)
     rhoR, uR, vR, YR, pR, aR = aux_func.U_to_prim(Ur, aux_r)
-    EL = Ul[3] / rhoL  # 总能量密度/rho
+
+    EL = Ul[3] / rhoL
     ER = Ur[3] / rhoR
 
-    # 法向速度（用于波速和通量计算）
-    if ixy == 1:
-        u_nL = uL
-        u_nR = uR
-        tangL = vL
-        tangR = vR
-    else:
-        u_nL = vL
-        u_nR = vR
-        tangL = uL
-        tangR = uR
+    # 用 ixy 控制提取的方向变量，避免 if
+    u_nL = jnp.where(ixy == 1, uL, vL)
+    u_nR = jnp.where(ixy == 1, uR, vR)
+    tangL = jnp.where(ixy == 1, vL, uL)
+    tangR = jnp.where(ixy == 1, vR, uR)
 
     # 波速估计
     SL = jnp.minimum(u_nL - aL, u_nR - aR)
     SR = jnp.maximum(u_nL + aL, u_nR + aR)
 
-    # 中间波速估计（Toro's formula）
+    # 中间波速 S*
     S_star = (pR - pL + rhoL * u_nL * (SL - u_nL) - rhoR * u_nR * (SR - u_nR)) / (
         rhoL * (SL - u_nL) - rhoR * (SR - u_nR) + 1e-6
     )
 
-    # 构造左右通量
-    FL = flux(Ul, aux_l, ixy)  # shape (5, Nx, Ny)
+    # 左右通量
+    FL = flux(Ul, aux_l, ixy)
     FR = flux(Ur, aux_r, ixy)
 
-    # 左右星区状态
-    def U_star(U, rho, u_n, S, S_star):
+    # 定义星区状态函数
+    def U_star(U, rho, u_n, tang, S, S_star, p, side):
         factor = rho * (S - u_n) / (S - S_star + 1e-6)
-        Ust = jnp.zeros_like(U)
-        Ust = Ust.at[0].set(factor)  # rho*
-        Ust = Ust.at[1].set(factor * (S_star if ixy == 1 else tangL))  # rho*u or rho*v
-        Ust = Ust.at[2].set(factor * (tangL if ixy == 1 else S_star))  # rho*v or rho*u
+        E = U[3] / rho
+        Y = U[4] / rho
 
-        En = U[3] / rho  # total energy per unit mass
-        E_star = (S - u_n) * (En + (S_star - u_n) * (S_star + pL / (rho * (S - u_n) + 1e-6)))  # approximate E*
-        Ust = Ust.at[3].set(factor * (En + (S_star - u_n) * (S_star + pL / (rho * (S - u_n) + 1e-6))))
-        Ust = Ust.at[4].set(factor * (U[4] / rho))  # species Y
-
+        # 构造星区守恒变量
+        Ust = jnp.stack([
+            factor,                              # rho*
+            factor * jnp.where(ixy == 1, S_star, tang),  # rho*u
+            factor * jnp.where(ixy == 1, tang, S_star),  # rho*v
+            factor * (E + (S_star - u_n) * (S_star + p / (rho * (S - u_n + 1e-6)))),  # rho*E*
+            factor * Y                           # rho*Y
+        ], axis=0)
         return Ust
 
-    UL_star = U_star(Ul, rhoL, u_nL, SL, S_star)
-    UR_star = U_star(Ur, rhoR, u_nR, SR, S_star)
+    UL_star = U_star(Ul, rhoL, u_nL, tangL, SL, S_star, pL, 'L')
+    UR_star = U_star(Ur, rhoR, u_nR, tangR, SR, S_star, pR, 'R')
 
-    # 构造通量
     F_star_L = FL + SL * (UL_star - Ul)
     F_star_R = FR + SR * (UR_star - Ur)
 
-    # 分段选择
+    # HLLC分段选择
     flux_HLLC = jnp.where(
         SL >= 0, FL,
         jnp.where(S_star >= 0, F_star_L,
@@ -562,6 +549,7 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
     )
 
     return flux_HLLC
+
 
 @jit
 def weno5_HLLC(U, aux, dx, dy):
