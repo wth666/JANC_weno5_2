@@ -553,15 +553,19 @@ def weno5_HLLC(U, aux, dx, dy):
 
     Ul = WENO_L_x(U)
     Ur = WENO_R_x(U)
-    aux_l = aux_func.update_aux(Ul, aux)
-    aux_r = aux_func.update_aux(Ur, aux)
+    auxl = WENO_L_x(aux)
+    auxr = WENO_R_x(aux)
+    aux_l = aux_func.update_aux(Ul, auxl)
+    aux_r = aux_func.update_aux(Ur, auxr)
     flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
     dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
 
     Ul = WENO_L_y(U)
     Ur = WENO_R_y(U)
-    aux_l = aux_func.update_aux(Ul, aux)
-    aux_r = aux_func.update_aux(Ur, aux)
+    auxl = WENO_L_y(aux)
+    auxr = WENO_R_y(aux)
+    aux_l = aux_func.update_aux(Ul, auxl)
+    aux_r = aux_func.update_aux(Ur, auxr)
     flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
     dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
 
