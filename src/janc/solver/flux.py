@@ -523,7 +523,7 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
         Y = U[4:,:,:] / rho
 
         # 构造星区守恒变量
-        Ust = jnp.stack([
+        Ust = jnp.concatenate([
             factor,                              # rho*
             factor * jnp.where(ixy == 1, S_star, tang),  # rho*u
             factor * jnp.where(ixy == 1, tang, S_star),  # rho*v
