@@ -366,7 +366,7 @@ def weno5_amr(field,dx,dy):
 
 
 
-###################HLLC#######################
+
 @jit
 def WENO_L_x(f):
     fj = f[:,2:-3,3:-3]
