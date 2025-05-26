@@ -3,6 +3,7 @@ from jax import jit,vmap,pmap
 from ..solver import aux_func
 from .flux import weno5
 from .flux import weno5_w
+from .flux import weno5_HLLC
 from ..thermodynamics import thermo
 from ..thermodynamics import chemical
 from ..boundary import boundary
