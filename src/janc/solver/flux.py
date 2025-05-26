@@ -493,87 +493,75 @@ def WENO_R_y(f):
 
 @jit
 def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
+    """
+    Compute HLLC flux given left and right conservative variables and auxiliary info.
 
-    # 1. 计算左、右状态的原始变量
+    Ul, Ur: shape (5, Nx, Ny)  # [rho, rho*u, rho*v, rho*E, rho*Y]
+    aux_l, aux_r: contain (rho, u, v, p, a) or similar
+    ixy: 1 for x-direction, 2 for y-direction
+    """
+
+    # 提取左右状态变量
     rhoL, uL, vL, YL, pL, aL = aux_func.U_to_prim(Ul, aux_l)
     rhoR, uR, vR, YR, pR, aR = aux_func.U_to_prim(Ur, aux_r)
+    EL = Ul[3] / rhoL  # 总能量密度/rho
+    ER = Ur[3] / rhoR
 
-    # 2. 计算法向速度
-    u_nL = jnp.where(ixy == 1, uL, vL)
-    u_nR = jnp.where(ixy == 1, uR, vR)
+    # 法向速度（用于波速和通量计算）
+    if ixy == 1:
+        u_nL = uL
+        u_nR = uR
+        tangL = vL
+        tangR = vR
+    else:
+        u_nL = vL
+        u_nR = vR
+        tangL = uL
+        tangR = uR
 
-    # 3. 计算波速 SL, SR（估计左、右最大波速）
+    # 波速估计
     SL = jnp.minimum(u_nL - aL, u_nR - aR)
     SR = jnp.maximum(u_nL + aL, u_nR + aR)
 
-    # 4. 计算左、右物理通量
-    FL = flux(Ul, aux_l, ixy)
+    # 中间波速估计（Toro's formula）
+    S_star = (pR - pL + rhoL * u_nL * (SL - u_nL) - rhoR * u_nR * (SR - u_nR)) / (
+        rhoL * (SL - u_nL) - rhoR * (SR - u_nR) + 1e-6
+    )
+
+    # 构造左右通量
+    FL = flux(Ul, aux_l, ixy)  # shape (5, Nx, Ny)
     FR = flux(Ur, aux_r, ixy)
 
-    # 5. 计算星区速度 S_star（Toro公式）
-    numerator = pR - pL + rhoL * u_nL * (SL - u_nL) - rhoR * u_nR * (SR - u_nR)
-    denominator = rhoL * (SL - u_nL) - rhoR * (SR - u_nR) + 1e-16
-    S_star = numerator / denominator
+    # 左右星区状态
+    def U_star(U, rho, u_n, S, S_star):
+        factor = rho * (S - u_n) / (S - S_star + 1e-6)
+        Ust = jnp.zeros_like(U)
+        Ust = Ust.at[0].set(factor)  # rho*
+        Ust = Ust.at[1].set(factor * (S_star if ixy == 1 else tangL))  # rho*u or rho*v
+        Ust = Ust.at[2].set(factor * (tangL if ixy == 1 else S_star))  # rho*v or rho*u
 
-    # 6. 计算星区守恒变量 U*_L 和 U*_R
-    def calc_U_star(U, rho, u_n, S, S_star, p):
-        factor = rho * (S - u_n) / (S - S_star + 1e-16)
+        En = U[3] / rho  # total energy per unit mass
+        E_star = (S - u_n) * (En + (S_star - u_n) * (S_star + pL / (rho * (S - u_n) + 1e-6)))  # approximate E*
+        Ust = Ust.at[3].set(factor * (En + (S_star - u_n) * (S_star + pL / (rho * (S - u_n) + 1e-6))))
+        Ust = Ust.at[4].set(factor * (U[4] / rho))  # species Y
 
-        # 速度分量
-        u_ = U[1] / rho
-        v_ = U[2] / rho
-        # 速度向量
-        vel_vec = jnp.array([u_, v_])
+        return Ust
 
-        # 法向单位向量
-        n_vec = jnp.array([1.0, 0.0]) if ixy == 1 else jnp.array([0.0, 1.0])
+    UL_star = U_star(Ul, rhoL, u_nL, SL, S_star)
+    UR_star = U_star(Ur, rhoR, u_nR, SR, S_star)
 
-        # 法向速度和切向速度分量
-        u_n_vec = jnp.dot(vel_vec, n_vec)
-        u_t_vec = vel_vec - u_n_vec * n_vec
+    # 构造通量
+    F_star_L = FL + SL * (UL_star - Ul)
+    F_star_R = FR + SR * (UR_star - Ur)
 
-        # 星区速度向量：法向速度变为 S_star，切向速度保持不变
-        u_star_vec = S_star * n_vec + u_t_vec
+    # 分段选择
+    flux_HLLC = jnp.where(
+        SL >= 0, FL,
+        jnp.where(S_star >= 0, F_star_L,
+        jnp.where(SR > 0, F_star_R, FR))
+    )
 
-        # 星区总能量近似计算
-        E = U[3] / rho
-        kinetic_energy = 0.5 * (u_**2 + v_**2)
-        E_star = E + (S_star - u_n) * (S_star + p / (rho * (S - u_n)))
-
-        # 组装星区守恒量
-        U_star = jnp.stack([
-            factor * rho,
-            factor * rho * u_star_vec[0],
-            factor * rho * u_star_vec[1],
-            factor * rho * E_star,
-            factor * U[4] / rho  # 额外守恒量按比例缩放
-        ], axis=0)
-
-        return U_star
-
-    U_star_L = calc_U_star(Ul, rhoL, u_nL, SL, S_star, pL)
-    U_star_R = calc_U_star(Ur, rhoR, u_nR, SR, S_star, pR)
-
-    # 7. 计算星区通量
-    def F_star(U, U_star, S, S_star, F):
-        return F + S * (U_star - U)
-
-    F_star_L = F_star(Ul, U_star_L, SL, S_star, FL)
-    F_star_R = F_star(Ur, U_star_R, SR, S_star, FR)
-
-    # 8. 根据波速分段选择最终通量
-    cond1 = SL >= 0
-    cond2 = (SL < 0) & (S_star >= 0)
-    cond3 = (S_star < 0) & (SR > 0)
-    cond4 = SR <= 0
-
-    flux_out = jnp.where(cond1[None, ...], FL,
-                 jnp.where(cond2[None, ...], F_star_L,
-                  jnp.where(cond3[None, ...], F_star_R,
-                   jnp.where(cond4[None, ...], FR,
-                             jnp.zeros_like(FL)))))
-
-    return flux_out
+    return flux_HLLC
 
 @jit
 def weno5_HLLC(U, aux, dx, dy):
