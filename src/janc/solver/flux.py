@@ -315,7 +315,7 @@ def weno5_w(U,aux,dx,dy):
     Gplus, Gminus = splitFlux_LF_w(2, U, aux)
 
     Y = U[4:]/U[0:1]
-    '''
+    
     fj1,fj2 = WENO_plus_x_w(Fplus)
     Y1, Y2 = WENO_plus_x_w(Y)
     dFp = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
@@ -329,9 +329,9 @@ def weno5_w(U,aux,dx,dy):
     fj1, fj2 = WENO_minus_y_w(Gminus)
     Y1, Y2 = WENO_minus_y_w(Y)
     dGm = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
-    '''
-
     
+
+    '''
     fj1,fj2 = WENO_minus_x_w(Fplus)
     Y1, Y2 = WENO_minus_x_w(Y)
     dFp = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
@@ -345,7 +345,7 @@ def weno5_w(U,aux,dx,dy):
     fj1, fj2 = WENO_plus_y_w(Gminus)
     Y1, Y2 = WENO_plus_y_w(Y)
     dGm = jnp.concatenate([fj1 - fj2,Y1*fj1[0:1]-Y2*fj2[0:1]],axis=0)
-
+    '''
     
 
     dF = dFp + dFm
