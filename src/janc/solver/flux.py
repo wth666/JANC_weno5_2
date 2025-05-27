@@ -488,7 +488,7 @@ def WENO_R_y(f):
     return fj_halfm
 
 
-
+'''
 @jit
 def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
     # 提取左右状态
@@ -624,8 +624,140 @@ def flux(U, aux, ixy):
     F = zx*jnp.concatenate([rho * u, rho * u ** 2 + p, rho * u * v, u * (rhoE + p), rho * u * Y], axis=0) + zy*jnp.concatenate([rho * v, rho * u * v, rho * v ** 2 + p, v * (rhoE + p), rho * v * Y], axis=0)
     
     return F
+'''
+@jit
+def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
+    # 提取左右状态
+    rhoL, uL, vL, YL, pL, aL = aux_func.U_to_prim(Ul, aux_l)
+    rhoR, uR, vR, YR, pR, aR = aux_func.U_to_prim(Ur, aux_r)
+
+    EL = Ul[3:4,:,:] / rhoL
+    ER = Ur[3:4,:,:] / rhoR
+
+    # 用 ixy 控制提取的方向变量，避免 if
+    u_nL = jnp.where(ixy == 1, uL, vL)
+    u_nR = jnp.where(ixy == 1, uR, vR)
+    tangL = jnp.where(ixy == 1, vL, uL)
+    tangR = jnp.where(ixy == 1, vR, uR)
+
+    # 波速估计
+    SL = jnp.minimum(u_nL - aL, u_nR - aR)
+    SR = jnp.maximum(u_nL + aL, u_nR + aR)
+
+    # 中间波速 S*
+    S_star = (pR - pL + rhoL * u_nL * (SL - u_nL) - rhoR * u_nR * (SR - u_nR)) / (
+        rhoL * (SL - u_nL) - rhoR * (SR - u_nR) + 1e-6
+    )
+
+    # 左右通量
+    FL = flux(rhoL, uL, vL, YL, pL, Ul[3:4], ixy)
+    FR = flux(rhoR, uR, vR, YR, pR, Ur[3:4], ixy)
+
+    # 定义星区状态函数
+    def U_star(U, rho, u_n, tang, S, S_star, p, side):
+        factor = rho * (S - u_n) / (S - S_star + 1e-6)
+        E = U[3:4,:,:] / rho
+        Y = U[4:,:,:] / rho
+
+        # 构造星区守恒变量
+        Ust = jnp.concatenate([
+            factor,                              # rho*
+            factor * jnp.where(ixy == 1, S_star, tang),  # rho*u
+            factor * jnp.where(ixy == 1, tang, S_star),  # rho*v
+            factor * (E + (S_star - u_n) * (S_star + p / (rho * (S - u_n + 1e-6)))),  # rho*E*
+            factor * Y                           # rho*Y
+        ], axis=0)
+        return Ust
+
+    UL_star = U_star(Ul, rhoL, u_nL, tangL, SL, S_star, pL, 'L')
+    UR_star = U_star(Ur, rhoR, u_nR, tangR, SR, S_star, pR, 'R')
+
+    F_star_L = FL + SL * (UL_star - Ul)
+    F_star_R = FR + SR * (UR_star - Ur)
+
+    # HLLC分段选择
+    flux_HLLC = jnp.where(
+        SL >= 0, FL,
+        jnp.where(S_star >= 0, F_star_L,
+        jnp.where(SR > 0, F_star_R, FR))
+    )
+
+    return flux_HLLC
 
 
+@jit
+def weno5_HLLC(U, aux, dx, dy):
+    
+    rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
+    e = U[3:4]/U[0:1] - 0.5*(u**2+v**2)
+    Y = U[4:]/U[0:1]
+    var_p = jnp.concatenate([rho, u, v, p, e, Y], axis=0)
+    
+    var_p_l = WENO_L_x(var_p)
+    var_p_r = WENO_R_x(var_p)
+    
+    rho_l = var_p_l[0:1]
+    u_l = var_p_l[1:2]
+    v_l = var_p_l[2:3]
+    p_l = var_p_l[3:4]
+    e_l = var_p_l[4:5]
+    Y_l = var_p_l[5:]
+    R_l = thermo.get_R(Y_l)
+    T_l = p_l/(rho_l*R_l)
+    aux_l = thermo.get_T(e_l,Y_l,T_l)
+    rho_r = var_p_r[0:1]
+    u_r = var_p_r[1:2]
+    v_r = var_p_r[2:3]
+    p_r = var_p_r[3:4]
+    e_r = var_p_r[4:5]
+    Y_r = var_p_r[5:]
+    R_r = thermo.get_R(Y_r)
+    T_r = p_r/(rho_r*R_r)
+    aux_r = thermo.get_T(e_r,Y_r,T_r)
+    Ul = jnp.concatenate([rho_l, rho_l*u_l, rho_l*v_l, rho_l*(e_l+0.5*(u_l**2+v_l**2)), rho_l*Y_l],axis=0)
+    Ur = jnp.concatenate([rho_r, rho_r*u_r, rho_r*v_r, rho_r*(e_r+0.5*(u_r**2+v_r**2)), rho_r*Y_r],axis=0)
+    flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
+    dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
+
+    var_p_l = WENO_L_y(var_p)
+    var_p_r = WENO_R_y(var_p)
+    
+    rho_l = var_p_l[0:1]
+    u_l = var_p_l[1:2]
+    v_l = var_p_l[2:3]
+    p_l = var_p_l[3:4]
+    e_l = var_p_l[4:5]
+    Y_l = var_p_l[5:]
+    R_l = thermo.get_R(Y_l)
+    T_l = p_l/(rho_l*R_l)
+    aux_l = thermo.get_T(e_l,Y_l,T_l)
+    rho_r = var_p_r[0:1]
+    u_r = var_p_r[1:2]
+    v_r = var_p_r[2:3]
+    p_r = var_p_r[3:4]
+    e_r = var_p_r[4:5]
+    Y_r = var_p_r[5:]
+    R_r = thermo.get_R(Y_r)
+    T_r = p_r/(rho_r*R_r)
+    aux_r = thermo.get_T(e_r,Y_r,T_r)
+    Ul = jnp.concatenate([rho_l, rho_l*u_l, rho_l*v_l, rho_l*(e_l+0.5*(u_l**2+v_l**2)), rho_l*Y_l],axis=0)
+    Ur = jnp.concatenate([rho_r, rho_r*u_r, rho_r*v_r, rho_r*(e_r+0.5*(u_r**2+v_r**2)), rho_r*Y_r],axis=0)
+    flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
+    dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
+
+    netflux = dF + dG
+
+    return -netflux
+
+@jit
+def flux(rho, u, v, Y, p, rhoE, ixy):
+
+    zx = (ixy == 1) * 1
+    zy = (ixy == 2) * 1
+
+    F = zx*jnp.concatenate([rho * u, rho * u ** 2 + p, rho * u * v, u * (rhoE + p), rho * u * Y], axis=0) + zy*jnp.concatenate([rho * v, rho * u * v, rho * v ** 2 + p, v * (rhoE + p), rho * v * Y], axis=0)
+    
+    return F
 
 
 
