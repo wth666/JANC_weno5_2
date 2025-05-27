@@ -40,6 +40,8 @@ def aux_to_thermo(U,aux):
     gamma = aux[0:1]
     T = aux[1:2]
     return gamma,T
+    
+from jax import jit
 @jit
 def U_to_prim(U,aux):
     state = U
