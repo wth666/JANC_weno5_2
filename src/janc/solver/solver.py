@@ -110,9 +110,9 @@ def set_solver(thermo_set, boundary_set, source_set = None, nondim_set = None, s
         rho = U[0:1]
         Y = U[4:]/rho
         drhoY = chemical.solve_implicit_rate(T[:,:,220:],rho[:,:,220:],Y[:,:,220:],dt)
-        
+
         p1 = U[0:4,:,:]
-        p2 = jnp.concatenate([U[4:,:,:220],U[4:,:,220:] + drhoY],axis=2)
+        p2 = jnp.concatenate([U[4:,:,:220],jnp.clip(U[4:,:,220:] + drhoY,min = 0,max = rho)],axis=2)
         U_new = jnp.concatenate([p1,p2],axis=0)
         return jnp.concatenate([U_new,aux],axis=0)
 
