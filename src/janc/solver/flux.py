@@ -582,10 +582,10 @@ def weno5_HLLC(U, aux, dx, dy):
     Ur = jnp.concatenate([rho_r, rho_r*u_r, rho_r*v_r, rho_r*(e_r+0.5*(u_r**2+v_r**2)), rho_r*Y_r],axis=0)
     #flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
     #dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
-    #flux_hll = HLL_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
-    #dF = (flux_hll[:, 1:, :] - flux_hll[:, :-1, :]) / dx
-    flux_hllc_multi = HLLC_multi_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
-    dF = (flux_hllc_multi[:, 1:, :] - flux_hllc_multi[:, :-1, :]) / dx
+    flux_hll = HLL_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
+    dF = (flux_hll[:, 1:, :] - flux_hll[:, :-1, :]) / dx
+    #flux_hllc_multi = HLLC_multi_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
+    #dF = (flux_hllc_multi[:, 1:, :] - flux_hllc_multi[:, :-1, :]) / dx
 
     var_p_l = WENO_L_y(var_p)
     var_p_r = WENO_R_y(var_p)
@@ -612,10 +612,10 @@ def weno5_HLLC(U, aux, dx, dy):
     Ur = jnp.concatenate([rho_r, rho_r*u_r, rho_r*v_r, rho_r*(e_r+0.5*(u_r**2+v_r**2)), rho_r*Y_r],axis=0)
     #flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
     #dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
-    #flux_hll = HLL_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
-    #dG = (flux_hll[:, :, 1:] - flux_hll[:, :, :-1]) / dy
-    flux_hllc_multi = HLLC_multi_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
-    dG = (flux_hllc_multi[:, :, 1:] - flux_hllc_multi[:, :, :-1]) / dy
+    flux_hll = HLL_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
+    dG = (flux_hll[:, :, 1:] - flux_hll[:, :, :-1]) / dy
+    #flux_hllc_multi = HLLC_multi_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
+    #dG = (flux_hllc_multi[:, :, 1:] - flux_hllc_multi[:, :, :-1]) / dy
 
     netflux = dF + dG
 
