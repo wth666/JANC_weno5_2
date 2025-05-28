@@ -580,8 +580,10 @@ def weno5_HLLC(U, aux, dx, dy):
     aux_r = thermo.get_T(e_r,Y_r,T_r)
     Ul = jnp.concatenate([rho_l, rho_l*u_l, rho_l*v_l, rho_l*(e_l+0.5*(u_l**2+v_l**2)), rho_l*Y_l],axis=0)
     Ur = jnp.concatenate([rho_r, rho_r*u_r, rho_r*v_r, rho_r*(e_r+0.5*(u_r**2+v_r**2)), rho_r*Y_r],axis=0)
-    flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
-    dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
+    #flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
+    #dF = (flux_hllc[:, 1:, :] - flux_hllc[:, :-1, :]) / dx
+    flux_hll = HLL_flux(Ul, Ur, aux_l, aux_r, ixy=1)  # x方向
+    dF = (flux_hll[:, 1:, :] - flux_hll[:, :-1, :]) / dx
 
     var_p_l = WENO_L_y(var_p)
     var_p_r = WENO_R_y(var_p)
@@ -606,8 +608,10 @@ def weno5_HLLC(U, aux, dx, dy):
     aux_r = thermo.get_T(e_r,Y_r,T_r)
     Ul = jnp.concatenate([rho_l, rho_l*u_l, rho_l*v_l, rho_l*(e_l+0.5*(u_l**2+v_l**2)), rho_l*Y_l],axis=0)
     Ur = jnp.concatenate([rho_r, rho_r*u_r, rho_r*v_r, rho_r*(e_r+0.5*(u_r**2+v_r**2)), rho_r*Y_r],axis=0)
-    flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
-    dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
+    #flux_hllc = HLLC_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
+    #dG = (flux_hllc[:, :, 1:] - flux_hllc[:, :, :-1]) / dy
+    flux_hll = HLL_flux(Ul, Ur, aux_l, aux_r, ixy=2)  # y方向
+    dG = (flux_hll[:, :, 1:] - flux_hll[:, :, :-1]) / dy
 
     netflux = dF + dG
 
@@ -626,7 +630,33 @@ def flux(U, aux, ixy):
     return F
 
 
+@jit
+def HLL_flux(Ul, Ur, aux_l, aux_r, ixy):
+    # 提取左右状态
+    rhoL, uL, vL, YL, pL, aL = aux_func.U_to_prim(Ul, aux_l)
+    rhoR, uR, vR, YR, pR, aR = aux_func.U_to_prim(Ur, aux_r)
 
+    # 法向速度
+    u_nL = jnp.where(ixy == 1, uL, vL)
+    u_nR = jnp.where(ixy == 1, uR, vR)
+
+    # 波速估计（统一最小最大）
+    SL = jnp.minimum(u_nL - aL, u_nR - aR)
+    SR = jnp.maximum(u_nL + aL, u_nR + aR)
+
+    # 左右通量
+    FL = flux(Ul, aux_l, ixy)
+    FR = flux(Ur, aux_r, ixy)
+
+    # HLL 通量公式
+    flux_HLL = (
+        (SR * FL - SL * FR + SL * SR * (Ur - Ul)) /
+        (SR - SL + 1e-6)
+    )
+
+    # 分段返回
+    return jnp.where(SL >= 0, FL,
+           jnp.where(SR <= 0, FR, flux_HLL))
 
 
 
