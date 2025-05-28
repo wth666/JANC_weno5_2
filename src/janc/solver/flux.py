@@ -529,8 +529,7 @@ def HLLC_flux(Ul, Ur, aux_l, aux_r, ixy):
             factor * jnp.where(ixy == 1, S_star, tang),  # rho*u
             factor * jnp.where(ixy == 1, tang, S_star),  # rho*v
             factor * (E + (S_star - u_n) * (S_star + p / (rho * (S - u_n + 1e-6)))),  # rho*E*
-            #factor * Y                           # rho*Y
-            factor * (Y + (S_star - u_n) * (S_star + p / (rho * (S - u_n + 1e-6))))
+            factor * Y                           # rho*Y
         ], axis=0)
         return Ust
 
