@@ -683,7 +683,7 @@ def HLLC_multi_flux(Ul, Ur, aux_l, aux_r, ixy):
     p_ba = 0.5*(pL + pR)
     a_ba = 0.5*(aL + aR)
     p_pvrs = 0.5*(pL + pR) - 0.5*(u_nR - u_nL)*p_ba*a_ba
-    p_star = jnp.maximum(jnp.zeroslike(p_pvrs), p_pvrs)
+    p_star = jnp.maximum(0, p_pvrs)
 
     # 波速估计
     qL = jnp.where(p_star <= pL, 1.0, jnp.sqrt(1 + 0.5 * (gammaL + 1) / gammaL * (p_star / pL - 1)))
