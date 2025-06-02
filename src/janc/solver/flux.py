@@ -736,39 +736,39 @@ def HLLC_multi_flux(Ul, Ur, aux_l, aux_r, ixy):
 
 @jit
 def splitFlux_SW(ixy, U, aux):
-    zx = (ixy == 1) * 1
-    zy = (ixy == 2) * 1
+    zx = (ixy == 1) * 1
+    zy = (ixy == 2) * 1
 
-    rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
-    rhoE = state[3:4,:,:]
+    rho,u,v,Y,p,a = aux_func.U_to_prim(U,aux)
+    rhoE = state[3:4,:,:]
     gamma = aux[0:1]
-    theta = zx * u + zy * v
+    theta = zx * u + zy * v
 
-    H1 = (1 / (2 * gamma)) * jnp.concatenate([rho, rho * u - rho * a * zx, rho * v - rho * a * zy,
+    H1 = (1 / (2 * gamma)) * jnp.concatenate([rho, rho * u - rho * a * zx, rho * v - rho * a * zy,
                           rhoE + p - rho * a * theta, rho * yH2, rho * yO2, rho * yH2O], axis=0)
-    H2 = ((gamma - 1) / gamma) * jnp.concatenate(
+    H2 = ((gamma - 1) / gamma) * jnp.concatenate(
         [rho, rho * u, rho * v, 0.5 * rho * (u ** 2 + v ** 2), rho * yH2, rho * yO2, rho * yH2O], axis=0)
-    H4 = (1 / (2 * gamma)) * jnp.concatenate([rho, rho * u + rho * a * zx, rho * v + rho * a * zy,
+    H4 = (1 / (2 * gamma)) * jnp.concatenate([rho, rho * u + rho * a * zx, rho * v + rho * a * zy,
                           rhoE + p + rho * a * theta, rho * yH2, rho * yO2, rho * yH2O], axis=0)
 
-    lambda1 = zx * u + zy * v - a
-    lambda2 = zx * u + zy * v
-    lambda4 = zx * u + zy * v + a
-    eps = 1e-6
+    lambda1 = zx * u + zy * v - a
+    lambda2 = zx * u + zy * v
+    lambda4 = zx * u + zy * v + a
+    eps = 1e-6
 
-    lap1 = 0.5 * (lambda1 + jnp.sqrt(jnp.power(lambda1, 2) + eps**2))
-    lam1 = 0.5 * (lambda1 - jnp.sqrt(jnp.power(lambda1, 2) + eps**2))
+    lap1 = 0.5 * (lambda1 + jnp.sqrt(jnp.power(lambda1, 2) + eps**2))
+    lam1 = 0.5 * (lambda1 - jnp.sqrt(jnp.power(lambda1, 2) + eps**2))
 
-    lap2 = 0.5 * (lambda2 + jnp.sqrt(jnp.power(lambda2, 2) + eps**2))
-    lam2 = 0.5 * (lambda2 - jnp.sqrt(jnp.power(lambda2, 2) + eps**2))
+    lap2 = 0.5 * (lambda2 + jnp.sqrt(jnp.power(lambda2, 2) + eps**2))
+    lam2 = 0.5 * (lambda2 - jnp.sqrt(jnp.power(lambda2, 2) + eps**2))
 
-    lap4 = 0.5 * (lambda4 + jnp.sqrt(jnp.power(lambda4, 2) + eps**2))
-    lam4 = 0.5 * (lambda4 - jnp.sqrt(jnp.power(lambda4, 2) + eps**2))
+    lap4 = 0.5 * (lambda4 + jnp.sqrt(jnp.power(lambda4, 2) + eps**2))
+    lam4 = 0.5 * (lambda4 - jnp.sqrt(jnp.power(lambda4, 2) + eps**2))
 
-    Hplus = lap1 * H1 + lap2 * H2 + lap4 * H4
-    Hminus = lam1 * H1 + lam2 * H2 + lam4 * H4
+    Hplus = lap1 * H1 + lap2 * H2 + lap4 * H4
+    Hminus = lam1 * H1 + lam2 * H2 + lam4 * H4
 
-    return Hplus, Hminus
+    return Hplus, Hminus
 
 @jit
 def weno5_SW(U,aux,dx,dy):
