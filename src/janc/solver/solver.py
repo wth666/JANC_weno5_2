@@ -51,8 +51,8 @@ def set_solver(thermo_set, boundary_set, source_set = None, nondim_set = None, s
                 aux = aux_func.update_aux(U, aux)
                 U_with_ghost,aux_with_ghost = boundary.boundary_conditions(U,aux,theta)
                 #physical_rhs = weno5_w(U_with_ghost,aux_with_ghost,dx,dy) + aux_func.source_terms(U, aux, theta)
-                physical_rhs = weno5_HLLC(U_with_ghost,aux_with_ghost,dx,dy) + aux_func.source_terms(U, aux, theta)
-                #physical_rhs = weno5_SW(U_with_ghost,aux_with_ghost,dx,dy) + aux_func.source_terms(U, aux, theta)
+                #physical_rhs = weno5_HLLC(U_with_ghost,aux_with_ghost,dx,dy) + aux_func.source_terms(U, aux, theta)
+                physical_rhs = weno5_SW(U_with_ghost,aux_with_ghost,dx,dy) + aux_func.source_terms(U, aux, theta)
                 return physical_rhs
     
     if solver_mode == 'amr':
