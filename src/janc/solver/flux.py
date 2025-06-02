@@ -745,11 +745,11 @@ def splitFlux_SW(ixy, U, aux):
     theta = zx * u + zy * v
 
     H1 = (1 / (2 * gamma)) * jnp.concatenate([rho, rho * u - rho * a * zx, rho * v - rho * a * zy,
-                          rhoE + p - rho * a * theta, rho * yH2, rho * yO2, rho * yH2O], axis=0)
+                         rhoE + p - rho * a * theta, rho * yH2, rho * yO2, rho * yH2O], axis=0)
     H2 = ((gamma - 1) / gamma) * jnp.concatenate(
-        [rho, rho * u, rho * v, 0.5 * rho * (u ** 2 + v ** 2), rho * yH2, rho * yO2, rho * yH2O], axis=0)
+         [rho, rho * u, rho * v, 0.5 * rho * (u ** 2 + v ** 2), rho * yH2, rho * yO2, rho * yH2O], axis=0)
     H4 = (1 / (2 * gamma)) * jnp.concatenate([rho, rho * u + rho * a * zx, rho * v + rho * a * zy,
-                          rhoE + p + rho * a * theta, rho * yH2, rho * yO2, rho * yH2O], axis=0)
+                         rhoE + p + rho * a * theta, rho * yH2, rho * yO2, rho * yH2O], axis=0)
 
     lambda1 = zx * u + zy * v - a
     lambda2 = zx * u + zy * v
