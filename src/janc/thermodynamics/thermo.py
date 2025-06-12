@@ -18,8 +18,8 @@ T_max = 20
 scan_N = 100  # number of scan intervals
 scan_span = 0.2
 
-max_iter = 5
-tol = 5e-9
+max_iter = 5e10
+tol = 5e-4
 
 species_M = None
 Mex = None
