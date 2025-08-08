@@ -5,6 +5,7 @@ from .flux import weno5
 from .flux import weno5_w
 from .flux import weno5_HLLC
 from .flux import weno5_SW
+from .flux import weno5_KNP
 from ..thermodynamics import thermo
 from ..thermodynamics import chemical
 from ..boundary import boundary
@@ -171,6 +172,7 @@ def set_solver(thermo_set, boundary_set, source_set = None, nondim_set = None, s
         
 
     
+
 
 
 
