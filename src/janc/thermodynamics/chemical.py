@@ -11,6 +11,7 @@ import jax.numpy as jnp
 from jax import vmap,jit
 from ..preprocess import nondim
 from ..thermodynamics import thermo
+import jax
 
 Rg = 8.314463
 
@@ -148,6 +149,7 @@ def solve_implicit_rate(T,rho,Y,dt):
     dY = drhoY/rho
     dY = jnp.clip(dY,min=-Y[0:-1],max=1-Y[0:-1])
     return rho*dY
+
 
 
 
