@@ -5,13 +5,9 @@ from ..preprocess import nondim
 
 Rg = 8.314463
 
-def read_reaction_mechanism(file_path,nondim_config=None):
-    
-    nondim.set_nondim(nondim_config)
-    
-    # 读取文件
+def read_reaction_mechanism(file_path, nondim_config=None):
+
     gas = ct.Solution(file_path)
-    
     species_list = gas.species_names
 
     vf = gas.reactant_stoich_coeffs.T
@@ -21,61 +17,134 @@ def read_reaction_mechanism(file_path,nondim_config=None):
 
     non_zero_mask = jnp.any(vf + vb != 0, axis=0)
     zero_col_mask = jnp.all(vf + vb == 0, axis=0)
-    vf = vf[:,non_zero_mask]
-    vb = vb[:,non_zero_mask]
-    inert_check = jnp.logical_or(~jnp.any(zero_col_mask),jnp.all(zero_col_mask[jnp.argmax(zero_col_mask):]))
+    vf = vf[:, non_zero_mask]
+    vb = vb[:, non_zero_mask]
+    inert_check = jnp.logical_or(~jnp.any(zero_col_mask), jnp.all(zero_col_mask[jnp.argmax(zero_col_mask):]))
     assert inert_check, "Inert species must be the last elements in species_list"
     num_of_inert_species = jnp.sum(zero_col_mask)
 
-    vf_sum = jnp.sum(vf,axis=1)
-    vb_sum = jnp.sum(vb,axis=1)
+    vf_sum = jnp.sum(vf, axis=1)
+    vb_sum = jnp.sum(vb, axis=1)
 
-    A = []
-    B = []
-    Ea = []
+    A, B, Ea = [], [], []
+    A0, B0, Ea0 = [], [], []
+    Ainf, Binf, Eainf = [], [], []
+    falloff_type = []
+    falloff_params = []
+
     third_body_coeffs = jnp.zeros((n_reactions, n_species))
     is_third_body = jnp.zeros((n_reactions,))
-    # 填充矩阵
+    is_falloff = jnp.zeros((n_reactions,))
+
+    '''
+    for i, reaction in enumerate(gas.reactions()):
+        rate = reaction.rate
+        print(f"Reaction {i}, type: {reaction.reaction_type}, rate type: {type(rate)}")
+    '''
+
+
+
     for i, reaction in enumerate(gas.reactions()):
         reaction_order = sum(reaction.reactants.values())
-        if reaction.reaction_type == 'three-body-Arrhenius':
+        #print(vf_sum)
+
+        if reaction.reaction_type in ['three-body-Arrhenius', 'falloff-Lindemann', 'falloff-Troe']:
             efficiencies = reaction.third_body.efficiencies
-            reaction_order += 1
             for j, species in enumerate(species_list):
-                third_body_coeffs = third_body_coeffs.at[i, j].set(efficiencies.get(species, 1.0))  # 默认值 1.0
-        is_third_body = is_third_body.at[i].set(jnp.any(third_body_coeffs[i,:]>0)*1)
-        A.append(reaction.rate.pre_exponential_factor*((1e-3)**(reaction_order-1)))
-        B.append(reaction.rate.temperature_exponent)
-        Ea.append((reaction.rate.activation_energy)/1000)
-    
-    A = jnp.array(A)
-    B = jnp.array(B)
-    Ea = jnp.array(Ea)
+                third_body_coeffs = third_body_coeffs.at[i, j].set(efficiencies.get(species, 1.0))
 
-    #无量纲化
-    A = (nondim.t0/nondim.rho0)*(nondim.T0**B)*((nondim.rho0/nondim.M0)**vf_sum)*nondim.M0*A
-    EaOverRu = Ea/(nondim.e0*nondim.M0)
-    third_body_coeffs = third_body_coeffs*(nondim.rho0/nondim.M0)
+        is_third_body = is_third_body.at[i].set(jnp.any(third_body_coeffs[i, :]) * 1)
 
-    #形状填充
-    third_body_coeffs = jnp.expand_dims(third_body_coeffs,(2,3))
-    vf = jnp.expand_dims(vf,(2,3))
-    vb = jnp.expand_dims(vb,(2,3))
+        if reaction.reaction_type in ['falloff-Lindemann', 'falloff-Troe']:
+            is_falloff = is_falloff.at[i].set(1)
 
-    ReactionParams = {
+            low = reaction.rate.low_rate
+            high = reaction.rate.high_rate
+            A0.append(low.pre_exponential_factor * (1e-3) ** (reaction_order))
+            B0.append(low.temperature_exponent)
+            Ea0.append(low.activation_energy / 1000)
+
+            Ainf.append(high.pre_exponential_factor * (1e-3) ** (reaction_order - 1))
+            Binf.append(high.temperature_exponent)
+            Eainf.append(high.activation_energy / 1000)
+
+            if reaction.reaction_type == 'falloff-Troe':
+                f = reaction.rate
+                #print(f.falloff_coeffs)
+                falloff_type.append(2)
+                falloff_params.append(list(f.falloff_coeffs))
+            else:
+                falloff_type.append(1)
+                falloff_params.append([0.0, 0.0, 0.0, 0.0])
+
+            # 统一主数组占位
+            A.append(0.0); B.append(0.0); Ea.append(0.0)
+        else:
+            rate = reaction.rate
+            if reaction.reaction_type == 'three-body-Arrhenius':
+                A.append(rate.pre_exponential_factor * (1e-3) ** (reaction_order))
+            else:
+                A.append(rate.pre_exponential_factor * (1e-3) ** (reaction_order - 1))
+            B.append(rate.temperature_exponent)
+            Ea.append(rate.activation_energy / 1000)
+
+            A0.append(0.0); B0.append(0.0); Ea0.append(0.0)
+            Ainf.append(0.0); Binf.append(0.0); Eainf.append(0.0)
+            falloff_type.append(0)
+            falloff_params.append([0.0, 0.0, 0.0, 0.0])
+
+    # 转为 jnp
+    A = jnp.array(A); B = jnp.array(B); Ea = jnp.array(Ea)
+    A0 = jnp.array(A0); B0 = jnp.array(B0); Ea0 = jnp.array(Ea0)
+    Ainf = jnp.array(Ainf); Binf = jnp.array(Binf); Eainf = jnp.array(Eainf)
+    falloff_type = jnp.array(falloff_type)
+    falloff_params = jnp.array(falloff_params)
+
+    # 无量纲化
+    A = (t0 / rho0) * (T0 ** B) * ((rho0 / M0) ** (vf_sum + is_third_body)) * M0 * A
+    EaOverRu = Ea / (e0 * M0)
+    #EaOverRu = Ea / Rg / T0
+
+    A0 = (t0 / rho0) * (T0 ** B0) * ((rho0 / M0) ** (vf_sum + 1)) * M0 * A0
+    Ea0OverRu = Ea0 / (e0 * M0)
+    #Ea0OverRu = Ea0 / Rg / T0
+
+    Ainf = (t0 / rho0) * (T0 ** Binf) * ((rho0 / M0) ** vf_sum) * M0 * Ainf
+    EainfOverRu = Eainf / (e0 * M0)
+    #EainfOverRu = Eainf / Rg / T0
+
+    falloff_params = falloff_params.at[:,1:].set(falloff_params[:,1:]/T0)
+
+    #third_body_coeffs = third_body_coeffs * (rho0 / M0)
+
+    # 形状处理
+    third_body_coeffs = jnp.expand_dims(third_body_coeffs, (2, 3))
+    vf = jnp.expand_dims(vf, (2, 3))
+    vb = jnp.expand_dims(vb, (2, 3))
+
+    ReactionParams =  {
         'species': species_list,
         'vf': vf,
         'vb': vb,
         'A': A,
         'B': B,
         'Ea/Ru': EaOverRu,
-        'is_third_body':is_third_body,
+        'is_third_body': is_third_body,
         'third_body_coeffs': third_body_coeffs,
-        "num_of_reactions": n_reactions,
-        "num_of_species": n_species,
-        "num_of_inert_species":num_of_inert_species,
-        "vsum":vb_sum - vf_sum
-        }
+        'is_falloff': is_falloff,
+        'falloff_type': falloff_type,
+        'falloff_params': falloff_params,
+        'A0': A0,
+        'B0': B0,
+        'Ea0/Ru': Ea0OverRu,
+        'Ainf': Ainf,
+        'Binf': Binf,
+        'Eainf/Ru': EainfOverRu,
+        'num_of_reactions': n_reactions,
+        'num_of_species': n_species,
+        'num_of_inert_species': num_of_inert_species,
+        'vsum': vb_sum - vf_sum
+    }
     return ReactionParams
 
 
@@ -120,4 +189,5 @@ def get_cantera_coeffs(species_list,mech='gri30.yaml',nondim_config=None):
     logcof_high = coeffs_high[:,0]
     
     return species_M,Mex,Tcr,cp_cof_low,cp_cof_high,dcp_cof_low,dcp_cof_high,h_cof_low,h_cof_high,h_cof_low_chem,h_cof_high_chem,s_cof_low,s_cof_high,logcof_low,logcof_high
+
 
