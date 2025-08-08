@@ -174,10 +174,9 @@ def boundary_conditions(U, aux, theta=None):
     U_periodic_pad,aux_periodic_pad = pad(U,aux)
     U_with_lb,aux_with_lb = boundary_func['left_boundary'](U_periodic_pad,aux_periodic_pad, theta)
     U_with_rb,aux_with_rb = boundary_func['right_boundary'](U_with_lb,aux_with_lb,theta)
-    #U_with_bb,aux_with_bb = boundary_func['bottom_boundary'](U_with_rb,aux_with_rb,theta)
-    #U_with_ghost_cell,aux_with_ghost_cell = boundary_func['up_boundary'](U_with_bb,aux_with_bb,theta)
-    U_with_bb,aux_with_bb = boundary_func['up_boundary'](U_with_rb,aux_with_rb,theta)
-    U_with_ghost_cell,aux_with_ghost_cell = boundary_func['bottom_boundary'](U_with_bb,aux_with_bb,theta)
+    U_with_bb,aux_with_bb = boundary_func['bottom_boundary'](U_with_rb,aux_with_rb,theta)
+    U_with_ghost_cell,aux_with_ghost_cell = boundary_func['up_boundary'](U_with_bb,aux_with_bb,theta)
     return U_with_ghost_cell,aux_with_ghost_cell
+
 
 
