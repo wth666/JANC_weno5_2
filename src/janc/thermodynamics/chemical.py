@@ -96,7 +96,7 @@ def reactionConstant_i(T, X, i, k, n):
 
 
 
-    keq_i = jnp.exp(jnp.sum((vb_i-vf_i)*(thermo.get_gibbs(T[0,:,:])),axis=0,keepdims=True))*((101325/P0/T)**vsum)
+    keq_i = jnp.exp(jnp.sum((vb_i-vf_i)*(thermo.get_gibbs(T[0,:,:])),axis=0,keepdims=True))*((101325/nondim.P0/T)**vsum)
 
     kb_i = kf_i/keq_i
     dkb_i_drhonYn = dkf_i_drhonYn / keq_i
@@ -148,6 +148,7 @@ def solve_implicit_rate(T,rho,Y,dt):
     dY = drhoY/rho
     dY = jnp.clip(dY,min=-Y[0:-1],max=1-Y[0:-1])
     return rho*dY
+
 
 
 
