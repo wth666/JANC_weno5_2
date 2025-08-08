@@ -101,21 +101,17 @@ def read_reaction_mechanism(file_path, nondim_config=None):
     falloff_params = jnp.array(falloff_params)
 
     # 无量纲化
-    A = (t0 / rho0) * (T0 ** B) * ((rho0 / M0) ** (vf_sum + is_third_body)) * M0 * A
-    EaOverRu = Ea / (e0 * M0)
-    #EaOverRu = Ea / Rg / T0
+    A = (nondim.t0 / nondim.rho0) * (nondim.T0 ** B) * ((nondim.rho0 / nondim.M0) ** (vf_sum + is_third_body)) * nondim.M0 * A
+    EaOverRu = Ea / (nondim.e0 * nondim.M0)
 
-    A0 = (t0 / rho0) * (T0 ** B0) * ((rho0 / M0) ** (vf_sum + 1)) * M0 * A0
-    Ea0OverRu = Ea0 / (e0 * M0)
-    #Ea0OverRu = Ea0 / Rg / T0
+    A0 = (nondim.t0 / nondim.rho0) * (nondim.T0 ** B0) * ((nondim.rho0 / nondim.M0) ** (vf_sum + 1)) * nondim.M0 * A0
+    Ea0OverRu = Ea0 / (nondim.e0 * nondim.M0)
 
-    Ainf = (t0 / rho0) * (T0 ** Binf) * ((rho0 / M0) ** vf_sum) * M0 * Ainf
-    EainfOverRu = Eainf / (e0 * M0)
-    #EainfOverRu = Eainf / Rg / T0
+    Ainf = (nondim.t0 / nondim.rho0) * (nondim.T0 ** Binf) * ((nondim.rho0 / nondim.M0) ** vf_sum) * nondim.M0 * Ainf
+    EainfOverRu = Eainf / (nondim.e0 * nondim.M0)
 
-    falloff_params = falloff_params.at[:,1:].set(falloff_params[:,1:]/T0)
+    falloff_params = falloff_params.at[:,1:].set(falloff_params[:,1:]/nondim.T0)
 
-    #third_body_coeffs = third_body_coeffs * (rho0 / M0)
 
     # 形状处理
     third_body_coeffs = jnp.expand_dims(third_body_coeffs, (2, 3))
@@ -189,5 +185,6 @@ def get_cantera_coeffs(species_list,mech='gri30.yaml',nondim_config=None):
     logcof_high = coeffs_high[:,0]
     
     return species_M,Mex,Tcr,cp_cof_low,cp_cof_high,dcp_cof_low,dcp_cof_high,h_cof_low,h_cof_high,h_cof_low_chem,h_cof_high_chem,s_cof_low,s_cof_high,logcof_low,logcof_high
+
 
 
