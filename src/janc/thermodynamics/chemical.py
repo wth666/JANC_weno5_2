@@ -49,7 +49,7 @@ def reactionConstant_i(T, X, i, k, n):
     #aij_X_sum = is_third_body * aij_X_sum_TF + (1 - is_third_body)
 
     X = jnp.clip(X,min=1e-50)
-    X = X[0:n,:,:]
+    X = X[0:thermo.n,:,:]
     log_X = jnp.log(X)
     ain = thermo.ReactionParams["third_body_coeffs"][i,n]
     Mn = thermo.species_M[n]
@@ -148,6 +148,7 @@ def solve_implicit_rate(T,rho,Y,dt):
     dY = drhoY/rho
     dY = jnp.clip(dY,min=-Y[0:-1],max=1-Y[0:-1])
     return rho*dY
+
 
 
 
