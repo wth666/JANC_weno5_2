@@ -31,7 +31,8 @@ def set_boundary(boundary_config:dict):
                 
         if boundary_config['left_boundary'] == 'slip_wall':
             def left_boundary(padded_U,padded_aux,theta=None):
-                U_lb,aux_lb = padded_U[:,3:6,3:-3],padded_aux[:,3:6,3:-3]
+                #U_lb,aux_lb = padded_U[:,3:6,3:-3],padded_aux[:,3:6,3:-3]
+                U_lb,aux_lb = padded_U[:,4:7,3:-3],padded_aux[:,4:7,3:-3]
                 U_lb,aux_lb = slip_wall.left(U_lb,aux_lb)
                 U_with_lb,aux_with_lb = replace_lb(U_lb,aux_lb,padded_U,padded_aux)
                 return U_with_lb,aux_with_lb
@@ -69,7 +70,8 @@ def set_boundary(boundary_config:dict):
                 
         if boundary_config['right_boundary'] == 'slip_wall':
             def right_boundary(padded_U,padded_aux,theta=None):
-                U_rb,aux_rb = padded_U[:,-6:-3,3:-3],padded_aux[:,-6:-3,3:-3]
+                #U_rb,aux_rb = padded_U[:,-6:-3,3:-3],padded_aux[:,-6:-3,3:-3]
+                U_rb,aux_rb = padded_U[:,-7:-4,3:-3],padded_aux[:,-7:-4,3:-3]
                 U_rb,aux_rb = slip_wall.right(U_rb,aux_rb)
                 U_with_rb,aux_with_rb = replace_rb(U_rb,aux_rb,padded_U,padded_aux)
                 return U_with_rb,aux_with_rb
@@ -108,7 +110,8 @@ def set_boundary(boundary_config:dict):
                 
         if boundary_config['bottom_boundary'] == 'slip_wall':
             def bottom_boundary(padded_U,padded_aux,theta=None):
-                U_bb,aux_bb = padded_U[:,3:-3,3:6],padded_aux[:,3:-3,3:6]
+                #U_bb,aux_bb = padded_U[:,3:-3,3:6],padded_aux[:,3:-3,3:6]
+                U_bb,aux_bb = padded_U[:,3:-3,4:7],padded_aux[:,3:-3,4:7]
                 U_bb,aux_bb = slip_wall.bottom(U_bb,aux_bb)
                 U_with_bb,aux_with_bb = replace_bb(U_bb,aux_bb,padded_U,padded_aux)
                 return U_with_bb,aux_with_bb
@@ -147,7 +150,8 @@ def set_boundary(boundary_config:dict):
                 
         if boundary_config['up_boundary'] == 'slip_wall':
             def up_boundary(padded_U,padded_aux,theta=None):
-                U_ub,aux_ub = padded_U[:,3:-3,-6:-3],padded_aux[:,3:-3,-6:-3]
+                #U_ub,aux_ub = padded_U[:,3:-3,-6:-3],padded_aux[:,3:-3,-6:-3]
+                U_ub,aux_ub = padded_U[:,3:-3,-7:-4],padded_aux[:,3:-3,-7:-4]
                 U_ub,aux_ub = slip_wall.up(U_ub,aux_ub)
                 U_with_ub,aux_with_ub = replace_ub(U_ub,aux_ub,padded_U,padded_aux)
                 return U_with_ub,aux_with_ub
@@ -177,6 +181,7 @@ def boundary_conditions(U, aux, theta=None):
     U_with_bb,aux_with_bb = boundary_func['bottom_boundary'](U_with_rb,aux_with_rb,theta)
     U_with_ghost_cell,aux_with_ghost_cell = boundary_func['up_boundary'](U_with_bb,aux_with_bb,theta)
     return U_with_ghost_cell,aux_with_ghost_cell
+
 
 
 
